@@ -81,6 +81,17 @@ describe("best outdoor window", () => {
     });
   });
 
+  it("without a departure time: a complete best-stretch result with no commute fields at all", () => {
+    const r = bestWindow({ forecast: series((h) => (h >= 6 && h < 9 ? 70 : 200)), now: EARLY });
+    expect(r).toMatchObject({ verdict: "clear-best", routinePassed: false });
+    expect(r).not.toHaveProperty("routine");
+    if (r.verdict !== "clear-best") return;
+    expect(istLabel(r.best)).toBe("06:30–09:30");
+    expect(r.best.meanPm25).toBe(70);
+    expect(r.baseline.meanPm25).toBe(200);
+    expect(r.comparison.material).toBe(true);
+  });
+
   it("names no winner when nothing clears the bar (no routine): flat day", () => {
     const r = bestWindow({ forecast: series(() => 180), now: EARLY });
     expect(r.verdict).toBe("no-clear-best");

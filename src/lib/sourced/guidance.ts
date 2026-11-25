@@ -9,14 +9,13 @@
  */
 
 import type { CitationId } from "../grounding/citations";
+import type { Locale } from "../i18n/locales";
 import type { NaqiCategory } from "../grounding/types";
 import { categoryRank } from "../grounding/aqi/cpcb";
 import type { CookingFuel, HouseholdProfile } from "../profile/types";
 
-export interface Localized {
-  readonly en: string;
-  readonly hi: string;
-}
+/** One entry per UI language; the compiler flags any language that is missing. */
+export type Localized = Readonly<Record<Locale, string>>;
 
 export interface GuidanceSource {
   readonly citation: CitationId;

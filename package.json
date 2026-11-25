@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "probe": "tsx scripts/probe.mts",
-    "window": "tsx scripts/window-probe.mts"
+    "window": "tsx scripts/window-probe.mts",
+    "check:literals": "node scripts/check-jsx-literals.mjs"
   },
   "dependencies": {
     "next": "16.4.6",

@@ -1,26 +1,90 @@
 @import "tailwindcss";
 
+/*
+ * Clearhour palette: the subject is smog versus clear air.
+ *  smog     page background, cool winter haze
+ *  ink      text and everything MEASURED (solid, sharp)
+ *  station  surface for measured data (clean white slab)
+ *  model    everything FORECAST (violet, dashed, hazy)
+ *  sky      the clear window cut through the haze
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --smog: #e2e5e3;
+  --smog-deep: #cfd4d2;
+  --ink: #17222d;
+  --muted: #56626c;
+  --station: #ffffff;
+  --model: #5b53a3;
+  --model-haze: #d9d7ea;
+  --sky: #2c76b8;
+  --cat-good: #2f7d5b;
+  --cat-satisfactory: #6f8f2e;
+  --cat-moderate: #a17c12;
+  --cat-poor: #b85a22;
+  --cat-very-poor: #a33a3a;
+  --cat-severe: #6e2443;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --smog: #1b2228;
+    --smog-deep: #262f37;
+    --ink: #e8ecef;
+    --muted: #a3adb5;
+    --station: #0f161c;
+    --model: #a9a2e6;
+    --model-haze: #2b2944;
+    --sky: #6fb1ea;
+    --cat-good: #5fbf91;
+    --cat-satisfactory: #a8c55e;
+    --cat-moderate: #d9b44a;
+    --cat-poor: #e58a52;
+    --cat-very-poor: #e06a6a;
+    --cat-severe: #d77aa3;
   }
 }
 
+@theme inline {
+  --color-smog: var(--smog);
+  --color-smog-deep: var(--smog-deep);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-station: var(--station);
+  --color-model: var(--model);
+  --color-model-haze: var(--model-haze);
+  --color-sky: var(--sky);
+  --font-sans: var(--font-anek), system-ui, sans-serif;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--smog);
+  color: var(--ink);
+  font-family: var(--font-anek), system-ui, sans-serif;
+  font-variation-settings: "wdth" 100;
+  line-height: 1.5;
+}
+
+/* Condensed width of the same family, for the headline time and big numerals. */
+.type-condensed {
+  font-variation-settings: "wdth" 78;
+  font-stretch: 78%;
+}
+
+/* The forecast haze: a dotted violet texture, used only on forecast surfaces. */
+.haze {
+  background-color: var(--model-haze);
+  background-image: radial-gradient(color-mix(in srgb, var(--model) 22%, transparent) 1px, transparent 1.2px);
+  background-size: 7px 7px;
+}
+
+:focus-visible {
+  outline: 3px solid var(--sky);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
 }

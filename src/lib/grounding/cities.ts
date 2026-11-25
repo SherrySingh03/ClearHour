@@ -7,11 +7,12 @@
  * Names are keyed by locale. To add a language, add a key here.
  */
 
+import type { Locale } from "../i18n/locales";
 import type { LatLon } from "./types";
 
 export interface City {
   readonly id: string;
-  readonly names: Readonly<{ en: string; hi: string }>;
+  readonly names: Readonly<Record<Locale, string>>;
   readonly state: string;
   readonly center: LatLon;
 }

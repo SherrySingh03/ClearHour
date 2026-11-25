@@ -2,7 +2,11 @@
 
 A GenAI air-quality assistant for Indian households during winter smog. It shows the measured air now (with station and timestamp), today's forecast curve with the cleanest outdoor stretch, indoor measures that help, and lower-emission swaps for the household's routine. Every claim carries its source.
 
-> **Status:** grounding layer, sourced data and best-window logic are built and tested. The UI, onboarding, i18n and Gemini synthesis come next.
+> **Status:** grounding layer, sourced data, best-window logic, English/Hindi UI, onboarding and the main screen are built and tested. Gemini synthesis, the Indoor and Swaps sections, and deployment come next.
+
+## Languages
+
+All UI text comes from `getUiStrings(locale)` (`src/lib/i18n`). JSX contains no string literals: ESLint's `react/jsx-no-literals` checks JSX text and `npm run check:literals` checks user-facing attributes. Missing-data reasons stay as codes in the data layer and are translated only at render. To add a language: add its code to `LOCALES`, add `strings/<code>.ts` typed as `UiStrings`, register it in `BUNDLES`, then add the key to the `Record<Locale, string>` data (city names, guidance). The compiler lists anything missing.
 
 ## Grounding contract
 
@@ -38,7 +42,8 @@ Every number below was checked on 2026-11-25 against the publisher's own documen
 - **CEA CO₂ Baseline Database.** `cea.nic.in` refused connections on port 443 from two networks. Version 20.0 (Dec 2024) was read through an Internet Archive capture: all-India weighted average **0.727 tCO₂/MWh** for FY 2023-24 (Table S). Version 22.0 could not be reached. No swap uses grid electricity yet, because the per-km energy figures metro or induction would need have no verified source.
 - **Metro.** No official per-passenger-km factor was found (DMRC publishes a per-trip saving). Metro swaps are **withheld** and show no number.
 - **Auto-rickshaw.** The source gives per-vehicle-km only. Without a sourced occupancy, auto swaps are **withheld**.
-- **DEFRA/DESNZ 2026** conversion factors were downloaded but not used. They describe the UK fleet and grid, and India-specific factors exist for every mode we compute.
+- **Transport factors date from 2015, and that is the latest verified India-specific set.** Checked 2026-11-25: the India GHG Program's transport page (indiaghgp.org/transport-emission-factors) still lists only the 2015 Version 1.0 road, rail and air papers, and searches found no later version. CEA does update yearly, but its database covers grid electricity, not vehicles. Old-but-sourced is used over newer-but-unverified.
+- **DEFRA/DESNZ 2026** conversion factors were downloaded but deliberately not used, not even as a cross-check. They describe the UK fleet and grid, and showing two factors for the same trip would invite "which one is right?" without adding rigour.
 - **Biomass cooking.** IPCC treats biomass CO₂ as biogenic, and stove efficiencies are unsourced. The case for switching is made on indoor air (MoHFW, WHO), with no CO₂ number.
 
 ## Assumptions
