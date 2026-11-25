@@ -19,7 +19,14 @@ export async function getPublicSnapshot(latitude: number, longitude: number): Pr
   const snapshot = await getGroundingSnapshot({ latitude, longitude }, { openaq });
 
   const notes = failureNotes(snapshot);
-  if (notes.length > 0) console.warn("[grounding]", JSON.stringify({ latitude, longitude, notes }));
+  if (notes.length > 0) {
+    // Area only (0.1° ≈ 11 km), never the rounded point we were asked about.
+    // `detail` never includes the API key (it travels only in a request header);
+    // it is capped so a large upstream body cannot flood the log.
+    const area = `${latitude.toFixed(1)},${longitude.toFixed(1)}`;
+    const logged = notes.map((n) => (n.detail ? { ...n, detail: n.detail.slice(0, 200) } : n));
+    console.warn("[grounding]", JSON.stringify({ area, notes: logged }));
+  }
 
   if (isCacheable(snapshot)) cacheLife({ stale: 300, revalidate: 600, expire: 3600 });
   else cacheLife("seconds");

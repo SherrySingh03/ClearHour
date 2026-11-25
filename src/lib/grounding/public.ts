@@ -6,7 +6,16 @@
  * reason codes alone.
  */
 
-import type { Grounded, GroundingSnapshot, LatLon, MeasuredBlock, Pollutant } from "./types";
+import type {
+  ForecastMissingReason,
+  Grounded,
+  GroundingSnapshot,
+  LatLon,
+  MeasuredBlock,
+  MeasuredMissingReason,
+  NaqiMissingReason,
+  Pollutant,
+} from "./types";
 import { ok, POLLUTANTS } from "./types";
 
 function stripDetail<T, R extends string>(g: Grounded<T, R>): Grounded<T, R> {
@@ -25,16 +34,37 @@ export function toPublicSnapshot(s: GroundingSnapshot): GroundingSnapshot {
   return { ...s, measured, forecast: stripDetail(s.forecast) };
 }
 
+type AnyMissingReason = MeasuredMissingReason | ForecastMissingReason | NaqiMissingReason;
+
+/**
+ * true = transient outage or upstream fault: retry soon, never cache for long.
+ * false = a real answer about the world (no station, too few hours) that can
+ * be cached like any other result.
+ * A Record, so adding a new reason code fails to compile until it is classified here.
+ */
+const IS_OUTAGE: Readonly<Record<AnyMissingReason, boolean>> = {
+  "no-station-in-radius": false,
+  "openaq-key-missing": true,
+  "openaq-unavailable": true,
+  "openaq-schema-mismatch": true,
+  "insufficient-hours": false,
+  "no-sensor": false,
+  "no-live-sensor": false,
+  "open-meteo-unavailable": true,
+  "open-meteo-schema-mismatch": true,
+  "forecast-empty": true,
+};
+
 export interface FailureNote {
   readonly where: "measured" | "forecast" | `naqi24h.${Pollutant}`;
-  readonly reason: string;
+  readonly reason: AnyMissingReason;
   readonly detail?: string;
 }
 
 /** Every failure with its detail, for server-side logging. */
 export function failureNotes(s: GroundingSnapshot): FailureNote[] {
   const notes: FailureNote[] = [];
-  const add = (where: FailureNote["where"], g: Grounded<unknown, string>) => {
+  const add = (where: FailureNote["where"], g: Grounded<unknown, AnyMissingReason>) => {
     if (!g.ok) notes.push(g.detail === undefined ? { where, reason: g.reason } : { where, reason: g.reason, detail: g.detail });
   };
   add("measured", s.measured);
@@ -44,12 +74,13 @@ export function failureNotes(s: GroundingSnapshot): FailureNote[] {
 }
 
 /**
- * Worth caching for the normal lifetime only when nothing failed because of
- * an outage. "No station in radius" is a real answer and can be cached;
- * "OpenAQ unreachable" or a missing forecast should be retried soon.
+ * Worth caching for the normal lifetime only when no part of the snapshot
+ * (including the per-pollutant 24 h AQI) failed because of an outage.
+ * "No station in radius" is a real answer and can be cached; "OpenAQ
+ * unreachable" anywhere should be retried soon.
  */
 export function isCacheable(s: GroundingSnapshot): boolean {
-  return s.forecast.ok && s.coverage.status !== "unknown";
+  return !failureNotes(s).some((n) => IS_OUTAGE[n.reason]);
 }
 
 /**

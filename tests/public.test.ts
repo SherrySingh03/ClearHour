@@ -62,6 +62,33 @@ describe("public snapshot", () => {
     expect(isCacheable(outage)).toBe(false);
   });
 
+  it("does not cache when only the 24 h AQI step hit an outage", async () => {
+    const forecastOk = async () =>
+      parseOpenMeteo(
+        {
+          latitude: 28.6,
+          longitude: 77.2,
+          utc_offset_seconds: 0,
+          hourly_units: { time: "unixtime", pm2_5: "μg/m³", pm10: "μg/m³" },
+          hourly: { time: [1795564800], pm2_5: [110], pm10: [115] },
+        },
+        NOW,
+      );
+    const s = await getGroundingSnapshot(CONNAUGHT_PLACE, {
+      openaq: fakeOpenAq({
+        search: () => ({ ok: true, data: [loc({ id: 2 })] }),
+        latest: () => ({ ok: true, data: [latest(22, 120), latest(21, 160)] }),
+        hours: () => ({ ok: false, error: { code: "unavailable", detail: "HTTP 503" } }),
+      }),
+      fetchForecast: forecastOk,
+      now: () => NOW,
+    });
+    expect(s.coverage.status).toBe("station");
+    expect(s.forecast.ok).toBe(true);
+    expect(s.measured.ok && s.measured.data.naqi24h.pm25).toMatchObject({ ok: false, reason: "openaq-unavailable" });
+    expect(isCacheable(s)).toBe(false);
+  });
+
   it("rounds coordinates to 0.01°", () => {
     expect(quantize({ latitude: 28.613912, longitude: 77.209047 })).toEqual({ latitude: 28.61, longitude: 77.21 });
   });
