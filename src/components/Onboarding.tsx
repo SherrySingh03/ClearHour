@@ -2,7 +2,7 @@
 
 import { useId, useState, type ReactNode } from "react";
 import { CITIES } from "@/lib/grounding/cities";
-import { COMMUTE_MODES, COOKING_FUELS, MAX_ONE_WAY_KM } from "@/lib/profile/storage";
+import { COMMUTE_MODES, COOKING_FUELS, MAX_ONE_WAY_KM, roundKm } from "@/lib/profile/storage";
 import type { CommuteMode, CookingFuel, HouseholdProfile } from "@/lib/profile/types";
 import { LanguageSwitch } from "./LanguageSwitch";
 import { useLocale } from "./LocaleContext";
@@ -35,7 +35,7 @@ function fromProfile(p: HouseholdProfile | null): Draft {
 
 function parseKm(s: string): number | null {
   const n = Number(s.replace(",", "."));
-  return Number.isFinite(n) && n > 0 && n <= MAX_ONE_WAY_KM ? n : null;
+  return Number.isFinite(n) && n > 0 && n <= MAX_ONE_WAY_KM ? Math.max(0.5, roundKm(n)) : null;
 }
 
 function toProfile(d: Draft): HouseholdProfile | null {

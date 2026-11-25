@@ -25,6 +25,8 @@ export interface PlanAllowance {
   readonly locale: Locale;
   /** Every number that appears in the input packet, normalised. */
   readonly numbers: ReadonlySet<string>;
+  /** Numbers that appeared directly before each unit. A number next to a unit must come from the same unit. */
+  readonly unitNumbers: Readonly<Record<"ugm3" | "kg" | "pct", ReadonlySet<string>>>;
   readonly guidanceIds: ReadonlySet<string>;
   readonly swapIds: ReadonlySet<string>;
   readonly windowAvailable: boolean;

@@ -17,7 +17,7 @@ import { selectGuidance, type CategorySignal } from "../sourced/guidance";
 import { swapsFor, type Swap, type SwapId } from "../sourced/swaps";
 import { bestWindow } from "./window";
 import { describeAge, describeWindow } from "../view/describe";
-import { extractNumbers } from "./numbers";
+import { extractNumbers, extractUnitNumbers } from "./numbers";
 import type { GapCode, PlanAllowance, RefDetail } from "./types";
 import type { Formatters, UiStrings } from "../i18n";
 
@@ -138,8 +138,13 @@ export function buildPlanInput({ snapshot, profile, locale, now }: PlanInput) {
   };
 
   const numbers = new Set<string>();
+  const unitNumbers = { ugm3: new Set<string>(), kg: new Set<string>(), pct: new Set<string>() };
   const collect = (x: unknown): void => {
-    if (typeof x === "string") extractNumbers(x).forEach((n) => numbers.add(n));
+    if (typeof x === "string") {
+      extractNumbers(x).forEach((n) => numbers.add(n));
+      const u = extractUnitNumbers(x);
+      for (const k of ["ugm3", "kg", "pct"] as const) u[k].forEach((n) => unitNumbers[k].add(n));
+    }
     else if (Array.isArray(x)) x.forEach(collect);
     else if (x && typeof x === "object") Object.values(x).forEach(collect);
   };
@@ -148,6 +153,7 @@ export function buildPlanInput({ snapshot, profile, locale, now }: PlanInput) {
   const allowance: PlanAllowance = {
     locale,
     numbers,
+    unitNumbers,
     guidanceIds: new Set(guidance.map((g) => g.item.id)),
     swapIds: new Set(swaps.map((s) => s.id)),
     windowAvailable,

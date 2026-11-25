@@ -10,13 +10,15 @@
  *  - links: no URLs
  *  - health: no health, medical or exposure claims (the UI shows CPCB's
  *    verbatim statement; the plan adds none)
- *  - numbers: no spelled-out quantities, and every numeral appears in the input
+ *  - numbers: no spelled-out quantities; no digits from other scripts or
+ *    numeric symbols; every numeral appears in the input; and a number next
+ *    to a unit (µg/m³, kg, %) appeared with that same unit in the input
  *  - language: written in the requested language
  */
 
 import { z } from "zod";
 import { missing, ok, type Grounded } from "../grounding/types";
-import { containsNumberWord, extractNumbers } from "./numbers";
+import { containsNumberWord, extractNumbers, extractUnitNumbers, hasUnsupportedNumerals } from "./numbers";
 import type { Plan, PlanAllowance } from "./types";
 
 export const LIMITS = { headline: 160, note: 240, maxSteps: 5 } as const;
@@ -87,8 +89,14 @@ export function validatePlan(raw: unknown, a: PlanAllowance): Grounded<Plan, Pla
     if (LINK.test(text)) return missing("link");
     if (HEALTH_EN.test(text) || HEALTH_HI.test(text)) return missing("health-claim", text);
     if (containsNumberWord(text)) return missing("number-word", text);
+    if (hasUnsupportedNumerals(text)) return missing("unknown-number", "unsupported-numerals");
     const stray = extractNumbers(text).find((n) => !a.numbers.has(n));
     if (stray !== undefined) return missing("unknown-number", stray);
+    const units = extractUnitNumbers(text);
+    for (const unit of ["ugm3", "kg", "pct"] as const) {
+      const misused = units[unit].find((n) => !a.unitNumbers[unit].has(n));
+      if (misused !== undefined) return missing("unknown-number", `${misused} ${unit}`);
+    }
   }
 
   const share = devanagariShare(texts.join(" "));

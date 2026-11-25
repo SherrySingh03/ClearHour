@@ -66,3 +66,36 @@ describe("no data-override paths ship in the app", () => {
     expect(hits.map(([f]) => f)).toEqual([]);
   });
 });
+
+describe("body size is enforced while streaming", () => {
+  it("rejects an oversized body that has no Content-Length, without buffering it all", async () => {
+    let pulled = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(c) {
+        pulled++;
+        if (pulled > 50) return c.close();
+        c.enqueue(new TextEncoder().encode("x".repeat(512)));
+      },
+    });
+    const r = new Request("http://localhost/api/plan", { method: "POST", headers: { "content-type": "application/json" }, body, duplex: "half" } as RequestInit);
+    expect(await parsePlanRequest(r)).toBeNull();
+    expect(pulled).toBeLessThan(10); // stopped right after passing 2 KB
+  });
+
+  it("rejects a declared Content-Length over the cap before reading", async () => {
+    const r = new Request("http://localhost/api/plan", { method: "POST", headers: { "content-type": "application/json", "content-length": "999999" }, body: "{}" });
+    expect(await parsePlanRequest(r)).toBeNull();
+  });
+});
+
+describe("profiles are canonicalised (bounded cache keys)", () => {
+  it("rounds distance to 0.5 km", async () => {
+    const p = { ...profile, commute: { mode: "car-petrol", oneWayKm: 12.34, departureHour: 9 } };
+    expect((await parsePlanRequest(req({ cityId: "delhi", locale: "en", profile: p })))?.profile.commute).toEqual({ mode: "car-petrol", oneWayKm: 12.5, departureHour: 9 });
+  });
+
+  it("drops distance and departure time when there is no commute", async () => {
+    const p = { ...profile, commute: { mode: "none", oneWayKm: 7, departureHour: 9 } };
+    expect((await parsePlanRequest(req({ cityId: "delhi", locale: "en", profile: p })))?.profile.commute).toEqual({ mode: "none", oneWayKm: 0 });
+  });
+});

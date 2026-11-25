@@ -32,6 +32,13 @@ export const COOKING_FUELS = ["lpg", "png", "electric", "biomass", "kerosene"] a
 /** Bounds for the onboarding distance field. Input sanity limits, not assumptions about anyone's commute. */
 export const MAX_ONE_WAY_KM = 100;
 
+/**
+ * Distances are kept to the nearest 0.5 km (assumptions.ts#distance-rounding).
+ * A rough guess doesn't need more precision, and it bounds the number of
+ * distinct profiles (and so distinct cached Gemini plans) a caller can create.
+ */
+export const roundKm = (km: number) => Math.round(km * 2) / 2;
+
 const ProfileSchema = z.object({
   cityId: z.string().refine((id) => findCity(id) !== undefined),
   commute: z.object({
@@ -47,7 +54,10 @@ const ProfileSchema = z.object({
 export function parseProfile(raw: unknown): HouseholdProfile | null {
   const r = ProfileSchema.safeParse(raw);
   if (!r.success) return null;
-  const { departureHour, ...commute } = r.data.commute;
+  const { departureHour, ...rest } = r.data.commute;
+  // Canonical form: no distance or departure time without a commute.
+  if (rest.mode === "none") return { ...r.data, commute: { mode: "none", oneWayKm: 0 } };
+  const commute = { ...rest, oneWayKm: roundKm(rest.oneWayKm) };
   return { ...r.data, commute: departureHour === undefined ? commute : { ...commute, departureHour } };
 }
 

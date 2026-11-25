@@ -34,6 +34,7 @@ export type AssumptionId =
   | "window-materially-cleaner"
   | "window-routine-stretch"
   | "plan-time-bucket"
+  | "distance-rounding"
   | "plan-health-vocabulary";
 
 export const ASSUMPTIONS: Readonly<Record<AssumptionId, Assumption>> = {
@@ -148,6 +149,12 @@ export const ASSUMPTIONS: Readonly<Record<AssumptionId, Assumption>> = {
     rationale:
       "Product rule set by the project owner. The OR keeps large drops visible during all-day Severe smog, when categories don't change. The absolute + relative pair handles both ends of the scale. If nothing clears the bar, no winner is named.",
     usedIn: ["src/lib/plan/window.ts"],
+  },
+  "distance-rounding": {
+    id: "distance-rounding",
+    value: "Nearest 0.5 km",
+    rationale: "Commute distance is a rough guess, so 0.5 km precision loses nothing. It also bounds how many distinct profiles, and so distinct cached Gemini plans, a caller can create.",
+    usedIn: ["src/lib/profile/storage.ts", "src/components/Onboarding.tsx"],
   },
   "plan-time-bucket": {
     id: "plan-time-bucket",

@@ -20,17 +20,49 @@ export interface PlanRequest {
   readonly profile: HouseholdProfile;
 }
 
-export async function parsePlanRequest(req: Request): Promise<PlanRequest | null> {
-  if (!(req.headers.get("content-type") ?? "").toLowerCase().startsWith("application/json")) return null;
-  const declared = Number(req.headers.get("content-length") ?? "0");
-  if (declared > MAX_BODY_BYTES) return null;
-  let text: string;
+/**
+ * Reads at most MAX_BODY_BYTES from the stream and stops as soon as the cap is
+ * passed, so an oversized body is never fully buffered. Content-Length is only
+ * an early hint; the streamed count is what is enforced.
+ */
+async function readBounded(req: Request): Promise<string | null> {
+  const declared = req.headers.get("content-length");
+  if (declared !== null && !(Number(declared) <= MAX_BODY_BYTES)) return null;
+  if (!req.body) return "";
+  const reader = req.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
   try {
-    text = await req.text();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_BODY_BYTES) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(value);
+    }
   } catch {
     return null;
   }
-  if (new TextEncoder().encode(text).length > MAX_BODY_BYTES) return null;
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const c of chunks) {
+    bytes.set(c, offset);
+    offset += c.byteLength;
+  }
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    return null;
+  }
+}
+
+export async function parsePlanRequest(req: Request): Promise<PlanRequest | null> {
+  if (!(req.headers.get("content-type") ?? "").toLowerCase().startsWith("application/json")) return null;
+  const text = await readBounded(req);
+  if (text === null) return null;
   let json: unknown;
   try {
     json = JSON.parse(text);

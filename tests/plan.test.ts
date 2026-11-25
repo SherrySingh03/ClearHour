@@ -124,3 +124,32 @@ describe("validator rejects the WHOLE plan", () => {
     expect(r).not.toHaveProperty("data");
   });
 });
+
+describe("number gate cannot be bypassed", () => {
+  const { allowance } = buildPlanInput(input);
+  const check = (note: string) => validatePlan(withStep(2, note), allowance);
+
+  it("rejects digits from other scripts (Bengali ৩৭) instead of ignoring them", () => {
+    expect(check("এটি ৩৭ কম")).toMatchObject({ ok: false });
+    expect(check("The bus saves ৩৭ today.")).toMatchObject({ ok: false, reason: "unknown-number" });
+  });
+
+  it("normalises fullwidth digits, then checks them like any number", () => {
+    expect(check("The bus saves about ３７ today.")).toEqual({ ok: false, reason: "unknown-number", detail: "37" });
+  });
+
+  it("rejects superscripts and vulgar fractions", () => {
+    expect(check("The bus cuts it by ²⁵ today.")).toMatchObject({ ok: false, reason: "unknown-number" });
+    expect(check("The bus cuts it by ½ today.")).toMatchObject({ ok: false, reason: "unknown-number" });
+  });
+
+  it("rejects a real input number reused with the wrong unit (AQI 220 written as a concentration)", () => {
+    expect(check("PM2.5 stands at 220 µg/m³ today.")).toEqual({ ok: false, reason: "unknown-number", detail: "220 ugm3" });
+    expect(check("The bus avoids 45 kg of CO₂.")).toEqual({ ok: false, reason: "unknown-number", detail: "45 kg" });
+  });
+
+  it("still accepts numbers used with their own unit", () => {
+    expect(check("The latest reading was 45 µg/m³ at the station.").ok).toBe(true);
+    expect(check("Taking the bus avoids about 2.3 kg of CO₂ on a working day.").ok).toBe(true);
+  });
+});
