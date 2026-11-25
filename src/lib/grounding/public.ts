@@ -88,6 +88,7 @@ export function isCacheable(s: GroundingSnapshot): boolean {
  * ~45 km forecast grid, yet it bounds the set of distinct lookups callers can
  * trigger, and the server never handles an exact home location.
  */
+/* JUDGMENT CALL — assumptions.ts#coordinate-rounding */
 export function quantize(p: LatLon): LatLon {
   const r = (x: number) => Math.round(x * 100) / 100;
   return { latitude: r(p.latitude), longitude: r(p.longitude) };

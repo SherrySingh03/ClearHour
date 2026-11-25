@@ -35,8 +35,10 @@ export interface ResolutionPolicy {
 }
 
 export const DEFAULT_POLICY: ResolutionPolicy = {
+  /** JUDGMENT CALL (not a standard) — assumptions.ts#station-radius. */
   radiusKm: 25,
   /**
+   * JUDGMENT CALL (not a standard) — assumptions.ts#station-freshness.
    * CPCB data reaches OpenAQ late. On 2026-11-25, all 48 live CPCB stations
    * within 25 km of Delhi had a newest reading 2.8–4.3 h old. 6 h accepts that
    * routine lag but still drops stations that have actually gone quiet. The

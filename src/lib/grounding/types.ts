@@ -213,9 +213,9 @@ export interface ComputedNaqiSubIndex {
   readonly hoursObserved: number;
   readonly hoursRequired: number;
   readonly windowUtc: { readonly from: IsoUtc; readonly to: IsoUtc };
-  /** Integer sub-index. For the Severe band CPCB publishes no upper breakpoint, so this is 401 and `isFloor` is true. */
+  /** Integer sub-index (CPCB calculator formula, rounded). Above 500 it is capped at 500 and `cappedAtScaleMax` is true. */
   readonly subIndex: number;
-  readonly isFloor: boolean;
+  readonly cappedAtScaleMax: boolean;
   readonly category: NaqiCategory;
   readonly stationId: number;
   readonly citations: readonly CitationId[];

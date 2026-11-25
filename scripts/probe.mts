@@ -43,7 +43,7 @@ for (const city of cities) {
     for (const [p, n] of Object.entries(s.measured.data.naqi24h)) {
       console.log(
         n.ok
-          ? `  NAQI ${p}: ${n.data.isFloor ? "≥" : ""}${n.data.subIndex} (${n.data.category}) from 24h avg ${n.data.average24h} over ${n.data.hoursObserved}h`
+          ? `  NAQI ${p}: ${n.data.cappedAtScaleMax ? "≥" : ""}${n.data.subIndex} (${n.data.category}) from 24h avg ${n.data.average24h} over ${n.data.hoursObserved}h`
           : `  NAQI ${p}: not computed → ${n.reason}${n.detail ? ` (${n.detail})` : ""}`,
       );
     }

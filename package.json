@@ -9,7 +9,8 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "probe": "tsx scripts/probe.mts"
+    "probe": "tsx scripts/probe.mts",
+    "window": "tsx scripts/window-probe.mts"
   },
   "dependencies": {
     "next": "16.4.6",

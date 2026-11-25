@@ -28,6 +28,7 @@ export async function getPublicSnapshot(latitude: number, longitude: number): Pr
     console.warn("[grounding]", JSON.stringify({ area, notes: logged }));
   }
 
+  // JUDGMENT CALL — assumptions.ts#snapshot-cache
   if (isCacheable(snapshot)) cacheLife({ stale: 300, revalidate: 600, expire: 3600 });
   else cacheLife("seconds");
 

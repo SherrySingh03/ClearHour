@@ -24,15 +24,30 @@ describe("CPCB NAQI breakpoints", () => {
     [431, "severe"],
   ] as const)("PM10 %s µg/m³ → %s", (c, cat) => expect(naqiCategory("pm10", c)).toBe(cat));
 
-  it("interpolates inside a band", () => {
-    // (100−51)/(60−30) × (45−30) + 51 = 75.5 → 76
-    expect(naqiSubIndex("pm25", 45)).toEqual({ subIndex: 76, isFloor: false, category: "satisfactory" });
-    // (200−101)/(250−100) × (200−100) + 101 = 167
-    expect(naqiSubIndex("pm10", 200)).toEqual({ subIndex: 167, isFloor: false, category: "moderate" });
+  it("reproduces the worked example stored in CPCB's AQI-Calculator.xls", () => {
+    // Cell C8 = 121 (PM10) → D8 = 114; cell C10 = 34 (PM2.5) → D10 = 56.67
+    expect(naqiSubIndex("pm10", 121).subIndex).toBe(114);
+    expect(naqiSubIndex("pm25", 34).subIndex).toBe(57);
   });
 
-  it("never invents an index above the published Severe floor", () => {
-    expect(naqiSubIndex("pm25", 600)).toEqual({ subIndex: 401, isFloor: true, category: "severe" });
+  it("follows the calculator formula inside each band", () => {
+    // 50 + (45−30)·50/30 = 75
+    expect(naqiSubIndex("pm25", 45)).toEqual({ subIndex: 75, cappedAtScaleMax: false, category: "satisfactory" });
+    // 100 + (200−100)·100/150 = 166.7 → 167
+    expect(naqiSubIndex("pm10", 200)).toEqual({ subIndex: 167, cappedAtScaleMax: false, category: "moderate" });
+    // band edges are continuous: 30 → 50, 60 → 100, 250 → 400
+    expect(naqiSubIndex("pm25", 30).subIndex).toBe(50);
+    expect(naqiSubIndex("pm25", 60).subIndex).toBe(100);
+    expect(naqiSubIndex("pm25", 250).subIndex).toBe(400);
+  });
+
+  it("continues the Very Poor slope into Severe, as the calculator does", () => {
+    // 400 + (300−250)·100/130 = 438.5 → 438
+    expect(naqiSubIndex("pm25", 300)).toEqual({ subIndex: 438, cappedAtScaleMax: false, category: "severe" });
+  });
+
+  it("caps at the 0–500 scale defined in the NAQI report", () => {
+    expect(naqiSubIndex("pm25", 600)).toEqual({ subIndex: 500, cappedAtScaleMax: true, category: "severe" });
   });
 
   it("rejects invalid concentrations instead of coercing them", () => {

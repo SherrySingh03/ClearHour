@@ -33,12 +33,13 @@ import {
 } from "./types";
 
 /**
+ * JUDGMENT CALL (not a standard) — assumptions.ts#pm-plausibility-ceiling.
  * Data-QA ceiling, not a health threshold: hourly PM values above this are
  * treated as instrument faults and ignored. They are never clamped.
  */
 export const MAX_PLAUSIBLE_PM_UGM3 = 1500;
 
-/** How many of the nearest eligible stations to try for a fresh reading. */
+/** JUDGMENT CALL — assumptions.ts#station-attempts. How many nearest eligible stations to try for a fresh reading. */
 const MAX_STATION_ATTEMPTS = 3;
 
 export interface SnapshotDeps {
@@ -259,7 +260,7 @@ export function naqiFromHours(
     return missing("insufficient-hours", `${values.length}/${NAQI_MIN_HOURS_24H}`);
   }
   const average24h = values.reduce((a, b) => a + b, 0) / values.length;
-  const { subIndex, isFloor, category } = naqiSubIndex(pollutant, average24h);
+  const { subIndex, cappedAtScaleMax, category } = naqiSubIndex(pollutant, average24h);
   return ok({
     kind: "computed",
     basis: "measured-24h-average",
@@ -270,9 +271,9 @@ export function naqiFromHours(
     hoursRequired: NAQI_MIN_HOURS_24H,
     windowUtc: { from: fromUtc, to: toUtc },
     subIndex,
-    isFloor,
+    cappedAtScaleMax,
     category,
     stationId,
-    citations: ["cpcb-naqi-2014", "cpcb-caaqms", "openaq-v3"],
+    citations: ["cpcb-naqi-2014", "cpcb-aqi-calculator", "cpcb-caaqms", "openaq-v3"],
   });
 }
