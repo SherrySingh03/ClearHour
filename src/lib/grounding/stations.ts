@@ -26,8 +26,12 @@ export interface ResolutionPolicy {
   readonly radiusKm: number;
   /** Station counts as offline if its last report is older than this. */
   readonly maxStalenessHours: number;
-  /** Provider-name patterns accepted as CPCB-network ground stations. */
-  readonly allowedProviders: readonly RegExp[];
+  /**
+   * OpenAQ provider ids accepted as CPCB-network ground stations. Matched by
+   * numeric id, not by name, so a provider whose name merely contains "CPCB"
+   * cannot pass.
+   */
+  readonly allowedProviderIds: ReadonlySet<number>;
 }
 
 export const DEFAULT_POLICY: ResolutionPolicy = {
@@ -39,7 +43,13 @@ export const DEFAULT_POLICY: ResolutionPolicy = {
    * reading's own timestamp is always shown, so the age is never hidden.
    */
   maxStalenessHours: 6,
-  allowedProviders: [/\bcpcb\b/i],
+  /**
+   * Checked live on 2026-11-25: provider 168 is named "CPCB" and covers the
+   * CAAQMS network, including stations run by state boards (DPCC, UPPCB,
+   * Kerala PCB, …). Provider 163 ("caaqm") is a legacy feed whose newest
+   * reading is from 2022-10-31, so it is excluded.
+   */
+  allowedProviderIds: new Set([168]),
 };
 
 export interface RankedStation {
@@ -83,7 +93,7 @@ export function resolveStations(
       reject("not-reference-monitor");
       continue;
     }
-    if (!policy.allowedProviders.some((re) => re.test(loc.provider.name))) {
+    if (!policy.allowedProviderIds.has(loc.provider.id)) {
       reject("provider-not-allowed");
       continue;
     }

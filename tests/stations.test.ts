@@ -41,8 +41,10 @@ describe("station resolution", () => {
     expect(resolveStations(CONNAUGHT_PLACE, [greekMu], NOW).ranked).toHaveLength(1);
   });
 
-  it("matches CPCB in a longer provider name", () => {
-    const named = loc({ id: 6, provider: { id: 1, name: "India CPCB" } });
-    expect(resolveStations(CONNAUGHT_PLACE, [named], NOW).ranked).toHaveLength(1);
+  it("matches the provider by id, so a lookalike name does not pass", () => {
+    const lookalike = loc({ id: 6, provider: { id: 999, name: "CPCB" } });
+    expect(resolveStations(CONNAUGHT_PLACE, [lookalike], NOW).rejected[0]?.reason).toBe("provider-not-allowed");
+    const legacy = loc({ id: 7, provider: { id: 163, name: "caaqm" } });
+    expect(resolveStations(CONNAUGHT_PLACE, [legacy], NOW).rejected[0]?.reason).toBe("provider-not-allowed");
   });
 });
