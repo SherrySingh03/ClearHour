@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { CITATIONS } from "@/lib/grounding/citations";
 import type { PlanResponse } from "@/lib/plan/types";
 import type { HouseholdProfile } from "@/lib/profile/types";
-import { describeGap } from "@/lib/view/describe";
+import { describeGap, uniqueCitations } from "@/lib/view/describe";
 import { useLocale } from "./LocaleContext";
 
 type Load = { status: "loading" } | { status: "failed" } | { status: "ready"; data: PlanResponse };
@@ -66,10 +66,10 @@ export function PlanPanel({ profile }: { profile: HouseholdProfile }) {
                   {ref?.kind === "guidance" && (
                     <div className="mt-1 text-sm text-muted">
                       <p>{ref.text}</p>
-                      {ref.sources.map((s) => (
-                        <p key={s.locator} className="mt-0.5 text-xs">
-                          <a className="underline underline-offset-2" href={CITATIONS[s.citation].url}>
-                            {t.plan.source({ title: CITATIONS[s.citation].publisher })}
+                      {uniqueCitations(ref.sources.map((s) => s.citation)).map((id) => (
+                        <p key={id} className="mt-0.5 text-xs">
+                          <a className="underline underline-offset-2" href={CITATIONS[id].url}>
+                            {t.plan.source({ title: CITATIONS[id].publisher })}
                           </a>
                         </p>
                       ))}
@@ -80,15 +80,13 @@ export function PlanPanel({ profile }: { profile: HouseholdProfile }) {
                       <p className="font-medium text-ink">{ref.action}</p>
                       <p>{ref.saving}</p>
                       {ref.onlyIfAvailable && <p className="italic">{t.swaps.ifAvailable}</p>}
-                      {ref.factors
-                        .filter((x) => x.citation !== null)
-                        .map((x) => (
-                          <p key={x.factorId} className="mt-0.5 text-xs">
-                            <a className="underline underline-offset-2" href={CITATIONS[x.citation!].url}>
-                              {t.plan.source({ title: CITATIONS[x.citation!].title })}
-                            </a>
-                          </p>
-                        ))}
+                      {uniqueCitations(ref.factors.map((x) => x.citation)).map((id) => (
+                        <p key={id} className="mt-0.5 text-xs">
+                          <a className="underline underline-offset-2" href={CITATIONS[id].url}>
+                            {t.plan.source({ title: CITATIONS[id].title })}
+                          </a>
+                        </p>
+                      ))}
                     </div>
                   )}
                 </li>

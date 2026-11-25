@@ -3,6 +3,10 @@
  * language must match exactly. Reason-code maps are typed Records over the
  * data layer's code unions, so a new code fails to compile until every
  * language has a message for it.
+ *
+ * Wording rule: every string that describes a number says what that number
+ * is: which timeframe (latest single hour, 24-hour average, prediction), what
+ * it is compared against, and where it was measured from.
  */
 
 import type { CommuteMode, CookingFuel } from "../../profile/types";
@@ -31,18 +35,21 @@ export interface UiStrings {
     readonly hoursAgo: Fn<{ n: number }>;
     readonly justNow: string;
   };
-  readonly key: { readonly measured: string; readonly forecast: string; readonly explainer: string };
+  /** The measured/forecast visual split, explained in plain words. */
+  readonly key: { readonly measured: string; readonly forecast: string };
   readonly header: { readonly editAnswers: string; readonly cityLabel: string };
   readonly onboarding: {
     readonly title: string;
+    readonly intro: string;
     readonly privacy: string;
     readonly progress: Fn<{ n: number; total: number }>;
     readonly back: string;
     readonly next: string;
     readonly finish: string;
-    readonly city: { readonly question: string; readonly hint: string; readonly placeholder: string };
+    readonly city: { readonly question: string; readonly why: string; readonly placeholder: string };
     readonly commute: {
       readonly question: string;
+      readonly why: string;
       readonly modes: Readonly<Record<CommuteMode, string>>;
       readonly distance: string;
       readonly distanceHint: string;
@@ -50,22 +57,33 @@ export interface UiStrings {
       readonly departureHint: string;
       readonly departureUnset: string;
     };
-    readonly cooking: { readonly question: string; readonly fuels: Readonly<Record<CookingFuel, string>> };
-    readonly household: { readonly question: string; readonly hint: string };
-    readonly purifier: { readonly question: string };
+    readonly cooking: { readonly question: string; readonly why: string; readonly fuels: Readonly<Record<CookingFuel, string>> };
+    readonly household: { readonly question: string; readonly why: string };
+    readonly purifier: { readonly question: string; readonly why: string };
   };
   readonly measured: {
     readonly badge: string;
-    readonly title: string;
+    /** Headline: the 24-hour CPCB category in plain words. */
+    readonly verdict: Readonly<Record<NaqiCategory, Fn<{ city: string }>>>;
+    readonly verdictBasis: string;
+    readonly scalePosition: Fn<{ category: string; n: string; total: string }>;
+    readonly cpcbSays: Fn<{ category: string }>;
+    readonly healthSource: string;
+    readonly aqiLabel: string;
+    readonly aqiScope: string;
+    readonly aqiCapped: string;
+    readonly latestLabel: string;
+    readonly observed: Fn<{ time: string; ago: string }>;
+    readonly aqiVsLatest: string;
+    readonly detailsTitle: string;
     readonly station: Fn<{ name: string; km: string }>;
     readonly network: string;
-    readonly observed: Fn<{ time: string; ago: string }>;
     readonly lagNote: string;
-    readonly aqiTitle: string;
     readonly aqiBasis: Fn<{ hours: number }>;
-    readonly aqiCapped: string;
-    readonly aqiVsLatest: string;
-    readonly healthSource: string;
+    readonly pm25Only: string;
+    /** Label for the 24-hour value wherever it is quoted (also given to the plan writer). */
+    readonly aqiTitle: string;
+    readonly noAqiTitle: string;
     readonly noPm25Now: string;
     readonly reasons: Readonly<Record<MeasuredMissingReason, string>>;
     readonly naqiReasons: Readonly<Record<NaqiMissingReason, string>>;
@@ -84,11 +102,18 @@ export interface UiStrings {
     readonly clearBest: Fn<{ best: string }>;
     readonly noClearBest: string;
     readonly noClearBestDetail: string;
+    /** Forecast exists, but no full stretch is left in today's outdoor hours. */
+    readonly tooLate: string;
+    readonly tooLateDetail: Fn<{ from: string; to: string }>;
     readonly routinePassed: string;
     readonly unavailable: string;
-    readonly drop: Fn<{ drop: string; pct: string }>;
+    readonly dropVsRoutine: Fn<{ drop: string; pct: string }>;
+    readonly dropVsTypical: Fn<{ drop: string; pct: string }>;
     readonly categoryShift: Fn<{ from: string; to: string }>;
+    /** Short form of the 3-hour-block caveat, always visible next to a window. */
+    readonly approxNote: string;
     readonly caveat: string;
+    readonly detailsTitle: string;
     readonly barTitle: string;
     readonly barBody: string;
   };
@@ -103,6 +128,7 @@ export interface UiStrings {
   readonly forecastReasons: Readonly<Record<ForecastMissingReason, string>>;
   readonly sources: {
     readonly title: string;
+    readonly neverMixed: string;
     readonly openaq: string;
     readonly cpcb: string;
     readonly openMeteo: string;
@@ -128,7 +154,7 @@ export interface UiStrings {
 }
 
 export const en: UiStrings = {
-  app: { name: "Clearhour", tagline: "When the air is cleanest today, and what helps at home" },
+  app: { name: "Clearhour", tagline: "How the air is today, the cleanest time to go out, and what helps at home" },
   common: {
     unitUgm3: "µg/m³",
     pm25: "PM2.5",
@@ -140,29 +166,30 @@ export const en: UiStrings = {
     km: ({ km }) => `${km} km`,
     kmUnit: "km",
     minutesAgo: ({ n }) => `${n} min ago`,
-    hoursAgo: ({ n }) => (n === 1 ? "1 hour ago" : `${n} hours ago`),
+    hoursAgo: ({ n }) => (n === 1 ? "about 1 hour ago" : `about ${n} hours ago`),
     justNow: "just now",
   },
   key: {
-    measured: "Measured at a station",
-    forecast: "Forecast from a model",
-    explainer: "Solid means measured. Dashed and hazy means forecast. The two are never combined.",
+    measured: "Solid boxes are readings from a real air monitor.",
+    forecast: "Hazy boxes are a prediction for later today.",
   },
-  header: { editAnswers: "Edit answers", cityLabel: "City" },
+  header: { editAnswers: "Change answers", cityLabel: "City" },
   onboarding: {
-    title: "Set up Clearhour",
-    privacy: "Your answers stay on this device. There's no account.",
-    progress: ({ n, total }) => `Question ${n} of ${total}`,
+    title: "A few quick questions",
+    intro: "Five questions, about twenty seconds. They let us fit today's advice to your home.",
+    privacy: "Your answers stay on this device. No account needed.",
+    progress: ({ n, total }) => `${n} of ${total}`,
     back: "Back",
     next: "Next",
-    finish: "Show today's plan",
+    finish: "Show my day",
     city: {
-      question: "Which city are you in?",
-      hint: "We use the nearest CPCB monitoring station to the city centre.",
-      placeholder: "Choose a city",
+      question: "Which city do you live in?",
+      why: "So we can find the nearest government air monitor. We look from the city centre and use the closest one with a recent reading.",
+      placeholder: "Choose your city",
     },
     commute: {
-      question: "How do you usually commute?",
+      question: "How do you usually get to work or school?",
+      why: "So we can compare the time you leave with the cleanest air, and show ways to travel with less CO₂.",
       modes: {
         "car-petrol": "Car (petrol)",
         "car-diesel": "Car (diesel)",
@@ -173,16 +200,17 @@ export const en: UiStrings = {
         metro: "Metro",
         "suburban-rail": "Local train",
         "walk-cycle": "Walk or cycle",
-        none: "I don't commute",
+        none: "I don't travel to work or school",
       },
-      distance: "Distance, one way",
+      distance: "About how far is it, one way?",
       distanceHint: "A rough guess is fine.",
-      departure: "Usual time you leave",
-      departureHint: "Optional. Lets us compare your commute with the cleanest time.",
+      departure: "What time do you usually leave?",
+      departureHint: "Optional. We'll compare it with the cleanest time of day.",
       departureUnset: "It varies",
     },
     cooking: {
-      question: "What do you cook with?",
+      question: "What do you usually cook on?",
+      why: "So we can include kitchen advice that fits your stove.",
       fuels: {
         lpg: "LPG cylinder",
         png: "Piped gas (PNG)",
@@ -191,38 +219,55 @@ export const en: UiStrings = {
         kerosene: "Kerosene",
       },
     },
-    household: { question: "Do children or elderly people live with you?", hint: "Some official advice is specific to them." },
-    purifier: { question: "Do you have an air purifier at home?" },
+    household: { question: "Do children or older people live with you?", why: "Some government advice is just for them." },
+    purifier: { question: "Do you have an air purifier at home?", why: "So we can include advice on using one, or choosing one." },
   },
   measured: {
-    badge: "Measured",
-    title: "Latest station reading",
-    station: ({ name, km }) => `${name}, ${km} away`,
-    network: "CPCB monitoring station, via OpenAQ",
-    observed: ({ time, ago }) => `Reading for ${time}, ${ago}`,
-    lagNote: "Station readings usually reach us a few hours after they are taken.",
-    aqiTitle: "24-hour CPCB AQI from PM2.5",
-    aqiBasis: ({ hours }) => `Calculated from ${hours} hourly readings at this station, using CPCB's formula.`,
-    aqiCapped: "At the top of the 0–500 scale",
-    aqiVsLatest: "The AQI averages the last 24 hours of readings. The number above is the latest single reading, so the two can differ.",
-    healthSource: "CPCB health statement for this category",
-    noPm25Now: "No recent PM2.5 reading from this station.",
+    badge: "Real monitor reading",
+    verdict: {
+      good: ({ city }) => `Good air in ${city} over the last 24 hours`,
+      satisfactory: ({ city }) => `Satisfactory air in ${city} over the last 24 hours`,
+      moderate: ({ city }) => `Moderate air pollution in ${city} over the last 24 hours`,
+      poor: ({ city }) => `Poor air in ${city} over the last 24 hours`,
+      "very-poor": ({ city }) => `Very poor air in ${city} over the last 24 hours`,
+      severe: ({ city }) => `Severe air pollution in ${city} over the last 24 hours`,
+    },
+    verdictBasis: "Based on fine dust (PM2.5) at a government air monitor, graded on CPCB's scale.",
+    scalePosition: ({ category, n, total }) => `${category} is level ${n} of ${total} on CPCB's scale, from Good to Severe.`,
+    cpcbSays: ({ category }) => `What CPCB says about ${category} air`,
+    healthSource: "CPCB, National Air Quality Index (2014)",
+    aqiLabel: "Daily air level (AQI)",
+    aqiScope: "Out of 500, averaged over the last 24 hours",
+    aqiCapped: "At the top of the scale",
+    latestLabel: "Latest fine-dust reading (PM2.5)",
+    observed: ({ time, ago }) => `For ${time}, ${ago}`,
+    aqiVsLatest: "The daily level covers 24 hours. The latest reading is a single hour, so the two can differ.",
+    detailsTitle: "About these readings",
+    station: ({ name, km }) => `Monitor: ${name}, ${km} from the city centre`,
+    network: "A CPCB monitoring station. Readings come to us through OpenAQ.",
+    lagNote: "Readings usually reach us a few hours after they are taken.",
+    aqiBasis: ({ hours }) => `The daily level is worked out from ${hours} hourly readings at this monitor in the last 24 hours, using CPCB's formula.`,
+    pm25Only: "It counts fine dust (PM2.5) only. CPCB's official AQI also counts other pollutants, so the official figure can be higher.",
+    aqiTitle: "Daily air level (AQI) from fine dust (PM2.5), averaged over the last 24 hours",
+    noAqiTitle: "Not enough readings for a daily air level",
+    noPm25Now: "No recent fine-dust (PM2.5) reading from this monitor.",
     reasons: {
-      "no-station-in-radius": "No CPCB station within 25 km has reported in the last 6 hours.",
-      "openaq-key-missing": "Station data isn't set up on this server.",
-      "openaq-unavailable": "Station data couldn't be reached. Try again in a few minutes.",
-      "openaq-schema-mismatch": "Station data arrived in an unexpected format, so it isn't shown.",
+      "no-station-in-radius": "No government air monitor within 25 km of the city centre has sent a reading in the last 6 hours.",
+      "openaq-key-missing": "Monitor readings aren't set up on this server.",
+      "openaq-unavailable": "Monitor readings couldn't be reached. Try again in a few minutes.",
+      "openaq-schema-mismatch": "Monitor readings arrived in an unexpected format, so they aren't shown.",
     },
     naqiReasons: {
-      "insufficient-hours": "Not enough hourly readings in the last 24 hours to calculate the CPCB AQI (CPCB requires 16).",
-      "no-sensor": "This station doesn't measure PM2.5.",
-      "no-live-sensor": "This station has no recent PM2.5 reading.",
-      "openaq-unavailable": "The station's recent hours couldn't be reached.",
-      "openaq-schema-mismatch": "The station's recent hours arrived in an unexpected format.",
+      "insufficient-hours": "Not enough hourly readings in the last 24 hours to work out a daily air level (CPCB needs at least 16).",
+      "no-sensor": "This monitor doesn't measure fine dust (PM2.5).",
+      "no-live-sensor": "This monitor has no recent fine-dust (PM2.5) reading.",
+      "openaq-unavailable": "This monitor's recent hours couldn't be reached.",
+      "openaq-schema-mismatch": "This monitor's recent hours arrived in an unexpected format, so they aren't shown.",
     },
-    forecastOnlyTitle: "Forecast only",
-    forecastOnlyBody: "No CPCB station within 25 km has reported recently, so there is no measurement to show. Everything below is modeled.",
-    unknownTitle: "Measurement unavailable",
+    forecastOnlyTitle: "No air monitor close enough",
+    forecastOnlyBody:
+      "No government air monitor within 25 km of the city centre has sent a reading in the last 6 hours, so there's nothing measured to show. The prediction below is all there is.",
+    unknownTitle: "Monitor readings aren't available right now",
   },
   categories: {
     good: "Good",
@@ -242,39 +287,45 @@ export const en: UiStrings = {
   },
   healthStatementIsTranslation: null,
   window: {
-    badge: "Forecast",
-    cleanerThanRoutine: ({ best, routine }) => `${best} looks clearly cleaner than your commute time, ${routine}`,
-    routineIsFine: ({ routine }) => `No time today looks clearly cleaner than your commute, ${routine}`,
-    clearBest: ({ best }) => `The cleanest stretch looks like ${best}`,
-    noClearBest: "No time today stands out as clearly cleaner",
-    noClearBestDetail: "The forecast has no stretch that is clearly cleaner than the rest of the day.",
-    routinePassed: "Your usual departure time has already passed today.",
-    unavailable: "There's no forecast right now, so there's no best time to show.",
-    drop: ({ drop, pct }) => `Forecast PM2.5 about ${drop} µg/m³ lower, ${pct}% less`,
-    categoryShift: ({ from, to }) => `Indicative CPCB category ${to} instead of ${from}`,
-    caveat: "This comes from a forecast model, not a measurement. The model works in 3-hour blocks, so treat these times as approximate.",
+    badge: "Prediction for later today",
+    cleanerThanRoutine: ({ best, routine }) => `Around ${best} looks clearly cleaner than the hours when you usually leave (${routine})`,
+    routineIsFine: ({ routine }) => `No other time today looks clearly cleaner than the hours when you usually leave (${routine})`,
+    clearBest: ({ best }) => `Cleanest time to be outside today: around ${best}`,
+    noClearBest: "No part of today is clearly cleaner than the rest",
+    noClearBestDetail: "The cleanest stretch left today isn't clearly better than a typical one, so there's no better time to pick.",
+    tooLate: "Too little of today is left to pick a cleaner time",
+    tooLateDetail: ({ from, to }) => `We only pick 3-hour stretches between ${from} and ${to}. Check again tomorrow morning.`,
+    routinePassed: "The time you usually leave has already passed today.",
+    unavailable: "The prediction isn't available right now",
+    dropVsRoutine: ({ drop, pct }) => `About ${drop} µg/m³ less fine dust predicted than when you usually leave (${pct}% less).`,
+    dropVsTypical: ({ drop, pct }) => `About ${drop} µg/m³ less fine dust predicted than a typical 3-hour stretch for the rest of today (${pct}% less).`,
+    categoryShift: ({ from, to }) => `Roughly ${to} instead of ${from} on CPCB's scale.`,
+    approxNote: "Times are approximate: the model works in 3-hour blocks.",
+    caveat: "This is a prediction from a computer model, not a reading. The model works in 3-hour blocks, so treat these times as approximate.",
+    detailsTitle: "How this prediction works",
     barTitle: "What counts as clearly cleaner",
     barBody:
-      "A better CPCB category, or PM2.5 at least 30 µg/m³ and 25% lower. Categories here are indicative: CPCB defines them for 24-hour averages, and these are 3-hour forecasts.",
+      "Either a better level on CPCB's scale, or at least 30 µg/m³ and 25% less fine dust (PM2.5). The levels here are only a rough guide: CPCB sets them for 24-hour averages, and these are 3-hour predictions.",
   },
   chart: {
-    title: "Today's PM2.5 forecast",
-    legendForecast: "Forecast PM2.5",
+    title: "Predicted fine dust (PM2.5) today",
+    legendForecast: "Prediction",
     legendBest: "Cleanest stretch",
-    legendRoutine: "Your commute",
+    legendRoutine: "When you usually leave",
     now: "Now",
-    summary: ({ min, max, minAt, maxAt }) => `Forecast PM2.5 today ranges from ${min} µg/m³ around ${minAt} to ${max} µg/m³ around ${maxAt}.`,
+    summary: ({ min, max, minAt, maxAt }) => `Predicted fine dust today goes from about ${min} µg/m³ around ${minAt} to ${max} µg/m³ around ${maxAt}.`,
   },
   forecastReasons: {
-    "open-meteo-unavailable": "The forecast couldn't be reached. Try again in a few minutes.",
-    "open-meteo-schema-mismatch": "The forecast arrived in an unexpected format, so it isn't shown.",
-    "forecast-empty": "The forecast has no values for this location.",
+    "open-meteo-unavailable": "The prediction couldn't be reached. Try again in a few minutes.",
+    "open-meteo-schema-mismatch": "The prediction arrived in an unexpected format, so it isn't shown.",
+    "forecast-empty": "The prediction has no values for this place.",
   },
   sources: {
     title: "Where this comes from",
-    openaq: "Station readings: OpenAQ (CPCB stations)",
-    cpcb: "AQI formula and health statements: CPCB National Air Quality Index (2014)",
-    openMeteo: "Forecast: Open-Meteo (CC BY 4.0)",
+    neverMixed: "Readings and predictions are never mixed into one number.",
+    openaq: "Monitor readings: OpenAQ (CPCB stations)",
+    cpcb: "Daily air level formula and CPCB statements: CPCB National Air Quality Index (2014)",
+    openMeteo: "Prediction: Open-Meteo (CC BY 4.0)",
     cams: "Generated using Copernicus Atmosphere Monitoring Service information",
   },
   swaps: {
@@ -291,13 +342,13 @@ export const en: UiStrings = {
     ifAvailable: "If it's available where you live or on your route.",
   },
   plan: {
-    title: "Today's plan",
-    byline: "Written by Gemini using only the readings, forecast and cited guidance on this page, and checked before it's shown.",
-    loading: "Preparing today's plan…",
-    failed: "Today's plan couldn't be prepared. The data above is still accurate.",
+    title: "Your plan for today",
+    byline: "Written by Google's Gemini AI from what's on this page and your answers, then checked before it's shown.",
+    loading: "Preparing your plan…",
+    failed: "Your plan couldn't be prepared. Everything above is still accurate.",
     retry: "Try again",
-    gapsIntro: "This plan has no data for:",
-    seeForecast: "See the forecast above",
+    gapsIntro: "This plan is missing:",
+    seeForecast: "See the prediction above",
     source: ({ title }) => `Source: ${title}`,
   },
   errors: { network: "Couldn't load today's air. Check your connection and try again." },

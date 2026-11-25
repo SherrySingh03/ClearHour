@@ -25,7 +25,7 @@ function canonical(n: string): string {
 }
 
 /** NFKC + Devanagari digits → ASCII. */
-function normalise(text: string): string {
+export function normalise(text: string): string {
   return text.normalize("NFKC").replace(/[०-९]/g, (d) => String(DEVANAGARI_DIGITS.indexOf(d)));
 }
 
@@ -66,6 +66,49 @@ export function extractUnitNumbers(text: string): Record<Unit, string[]> {
     for (const m of t.matchAll(UNIT_PATTERNS[unit])) out[unit].push(canonical(m[1]!));
   }
   return out;
+}
+
+/** Units that give a number a role; "km" and "hour" are recognised only so they are never mistaken for a bound value. */
+export type OccurrenceUnit = Unit | "km" | "hour";
+
+export interface NumberOccurrence {
+  readonly value: string;
+  readonly unit: OccurrenceUnit | null;
+}
+
+const POLLUTANT_NAMES = /PM\s?2\.5|PM\s?10|CO[₂2]/gi;
+const UGM3 = /[µμu]g\/m[³3]/gi;
+/**
+ * A number, unless it is part of a clock time ("8:30": both sides skipped),
+ * followed by an optional unit.
+ */
+const OCCURRENCE =
+  /(?<![\d:.,])(\d+(?:,\d{3})*(?:\.\d+)?)(?![\d:])(?:\s*-?\s*(UGMQ|micrograms?|kg|किलो|kilograms?|%|प्रतिशत|percent|km|किमी|kilomet(?:re|er)s?|hours?|hrs?|घंटे|घंटा|घंटों))?/gi;
+
+const UNIT_OF: ReadonlyArray<[RegExp, OccurrenceUnit]> = [
+  [/^(UGMQ|micrograms?)$/i, "ugm3"],
+  [/^(kg|किलो|kilograms?)$/i, "kg"],
+  [/^(%|प्रतिशत|percent)$/i, "pct"],
+  [/^(km|किमी|kilomet(?:re|er)s?)$/i, "km"],
+  [/^(hours?|hrs?|घंटे|घंटा|घंटों)$/i, "hour"],
+];
+
+/** Every number in the text with the unit written after it (if any). Clock times are skipped. */
+export function numberOccurrences(text: string): NumberOccurrence[] {
+  const t = normalise(text).replace(POLLUTANT_NAMES, " ").replace(UGM3, "UGMQ");
+  return [...t.matchAll(OCCURRENCE)].map((m) => {
+    const u = m[2];
+    const unit = u === undefined ? null : (UNIT_OF.find(([re]) => re.test(u))?.[1] ?? null);
+    return { value: canonical(m[1]!), unit };
+  });
+}
+
+/** Sentences, split after . ! ? ; or the danda. ("PM2.5" is not split: the dot has no space after it.) */
+export function sentences(text: string): string[] {
+  return text
+    .split(/(?<=[.!?;।])\s+|\n+/)
+    .map((x) => x.trim())
+    .filter(Boolean);
 }
 
 /** Spelled-out quantities. Hindi list avoids words that double as verbs (e.g. "दो" = "give"). */

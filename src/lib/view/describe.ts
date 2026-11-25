@@ -5,8 +5,9 @@
  */
 
 import type { Formatters, UiStrings } from "../i18n";
+import type { CitationId } from "../grounding/citations";
 import type { ForecastPoint, ForecastSeries } from "../grounding/types";
-import type { Comparison, WindowResult } from "../plan/window";
+import { OUTDOOR_END_HOUR, OUTDOOR_START_HOUR, type Comparison, type WindowResult } from "../plan/window";
 
 const IST_OFFSET_MS = 5.5 * 3_600_000;
 export const istDayKey = (utcMs: number) => new Date(utcMs + IST_OFFSET_MS).toISOString().slice(0, 10);
@@ -20,7 +21,8 @@ export function describeAge(observedUtc: string, now: Date, t: UiStrings): strin
   const minutes = Math.max(0, Math.floor((now.getTime() - Date.parse(observedUtc)) / 60_000));
   if (minutes < 2) return t.common.justNow;
   if (minutes < 60) return t.common.minutesAgo({ n: minutes });
-  return t.common.hoursAgo({ n: Math.floor(minutes / 60) });
+  // Rounded, and worded "about N hours", so a 3 h 50 min old reading never reads as "3 hours".
+  return t.common.hoursAgo({ n: Math.round(minutes / 60) });
 }
 
 export interface WindowView {
@@ -30,8 +32,10 @@ export interface WindowView {
   readonly showCaveat: boolean;
 }
 
-function comparisonLines(c: Comparison, fromCat: string, toCat: string, t: UiStrings, f: Formatters): string[] {
-  const lines = [t.window.drop({ drop: f.number(c.dropUgm3), pct: f.number(c.dropFraction * 100) })];
+/** `against` names what the drop is measured from, so the sentence says it. */
+function comparisonLines(c: Comparison, against: "routine" | "typical", fromCat: string, toCat: string, t: UiStrings, f: Formatters): string[] {
+  const p = { drop: f.number(c.dropUgm3), pct: f.number(c.dropFraction * 100) };
+  const lines = [against === "routine" ? t.window.dropVsRoutine(p) : t.window.dropVsTypical(p)];
   if (c.categoryImproved) lines.push(t.window.categoryShift({ from: fromCat, to: toCat }));
   return lines;
 }
@@ -40,12 +44,18 @@ export function describeWindow(r: WindowResult, t: UiStrings, f: Formatters): Wi
   const range = (s: { startUtc: string; endUtc: string }) => f.timeRange(s.startUtc, s.endUtc);
   switch (r.verdict) {
     case "no-forecast":
-    case "insufficient-forecast":
       return { headline: t.window.unavailable, details: [], showCaveat: false };
+    case "insufficient-forecast":
+      // The forecast exists (the curve is drawn); there is just no full stretch left in today's outdoor hours.
+      return {
+        headline: t.window.tooLate,
+        details: [t.window.tooLateDetail({ from: f.clockHour(OUTDOOR_START_HOUR), to: f.clockHour(OUTDOOR_END_HOUR) })],
+        showCaveat: false,
+      };
     case "cleaner-than-routine":
       return {
         headline: t.window.cleanerThanRoutine({ best: range(r.best), routine: range(r.routine) }),
-        details: comparisonLines(r.comparison, t.categories[r.routine.indicativeCategory], t.categories[r.best.indicativeCategory], t, f),
+        details: comparisonLines(r.comparison, "routine", t.categories[r.routine.indicativeCategory], t.categories[r.best.indicativeCategory], t, f),
         showCaveat: true,
       };
     case "routine-is-fine":
@@ -55,7 +65,7 @@ export function describeWindow(r: WindowResult, t: UiStrings, f: Formatters): Wi
         headline: t.window.clearBest({ best: range(r.best) }),
         details: [
           ...(r.routinePassed ? [t.window.routinePassed] : []),
-          ...comparisonLines(r.comparison, t.categories[r.baseline.indicativeCategory], t.categories[r.best.indicativeCategory], t, f),
+          ...comparisonLines(r.comparison, "typical", t.categories[r.baseline.indicativeCategory], t.categories[r.best.indicativeCategory], t, f),
         ],
         showCaveat: true,
       };
@@ -89,4 +99,9 @@ export function describeForecastRange(points: readonly ForecastPoint[], t: UiStr
   const min = valid.reduce((a, b) => (b.pm25 < a.pm25 ? b : a));
   const max = valid.reduce((a, b) => (b.pm25 > a.pm25 ? b : a));
   return t.chart.summary({ min: f.number(min.pm25), max: f.number(max.pm25), minAt: f.time(min.timeUtc), maxAt: f.time(max.timeUtc) });
+}
+
+/** One link per source document, however many items or factors in a plan step cite it. */
+export function uniqueCitations(ids: readonly (CitationId | null)[]): CitationId[] {
+  return [...new Set(ids.filter((id): id is CitationId => id !== null))];
 }

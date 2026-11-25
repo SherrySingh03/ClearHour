@@ -2,7 +2,7 @@
 
 A GenAI air-quality assistant for Indian households during winter smog. It shows the measured air now (with station and timestamp), today's forecast curve with the cleanest outdoor stretch, indoor measures that help, and lower-emission swaps for the household's routine. Every claim carries its source.
 
-> **Status:** grounding layer, sourced data, best-window logic, English/Hindi UI, onboarding and the main screen are built and tested. Gemini synthesis, the Indoor and Swaps sections, and deployment come next.
+> **Status:** grounding layer, sourced data, best-window logic, English/Hindi UI, onboarding, the main screen and Gemini synthesis are built and tested. The main screen leads with a plain-language verdict; numbers, station details and caveats sit beneath it or one tap away. The Indoor and Swaps sections and deployment come next.
 
 ## Languages
 
@@ -74,6 +74,7 @@ These are **Clearhour's own judgment calls, not published standards**. The sourc
 | `plan-concurrency` | 4 plan generations at once per server instance | Bounds Gemini spend; when full, an immediate generic 502 and a retry button. |
 | `plan-model-budget` | 50 s total; fallback only on 5xx/timeout with ≥ 15 s left | One shared deadline; never fall back on quota errors (429). |
 | `plan-time-bucket` | 15 minutes | Plan cache key granularity. The best window depends on time of day; this bounds Gemini calls. |
+| `plan-timeframe-binding` | Each measured/predicted number must be quoted with its timeframe, per sentence | The 24-hour AQI needs "24 hours" and no "now"; the latest reading is never "now" or a forecast; forecast numbers are called a forecast. Units alone let a real number be quoted as the wrong thing. |
 | `plan-health-vocabulary` | Broad English + Hindi health/medical/safety/exposure word list | Any match rejects the whole plan. A false positive costs a retry; a false negative would show an unsourced health claim. |
 
 ## Running
@@ -101,7 +102,7 @@ Without `OPENAQ_API_KEY` the measured side fails closed and only the labelled fo
 | **Models and fallback** | Primary `gemini-3.8-flash`. If it errors server-side (5xx, including 503 overload) or times out, `gemini-3.6-flash`, also listed as Stable, within one shared 50 s budget. No fallback on quota errors (429). Both go through the same validator. A live run on 2026-11-25 passed 6/6 plans (3 cities × English/Hindi): `npm run plan-probe -- delhi lucknow thiruvananthapuram`. |
 | **What it returns** | Structured JSON only (`responseJsonSchema`): a headline, 1–5 steps that each reference an input id (`window`, a guidance id or a swap id) with a short note, and the list of acknowledged data gaps. |
 | **What it may never produce** | A pollution number, an emission factor, a health threshold, a health or medical claim, a safety or exposure claim, or any number not already in its input. |
-| **How that is enforced** | `src/lib/plan/validate.ts` checks every plan before it is shown: schema and lengths, ids exist and aren't repeated, no window step without a forecast, exactly the input's gaps acknowledged, no links, no health vocabulary (English and Hindi), no spelled-out quantities, every numeral present in the input, right language. **Any failure rejects the whole plan.** |
+| **How that is enforced** | `src/lib/plan/validate.ts` checks every plan before it is shown: schema and lengths, ids exist and aren't repeated, no window step without a forecast, exactly the input's gaps acknowledged, no links, no health vocabulary (English and Hindi), no spelled-out quantities, every numeral present in the input (with its own unit), every measured or predicted number quoted with its timeframe (the 24-hour AQI as 24-hour and never "now"; a forecast as a forecast), right language. **Any failure rejects the whole plan.** |
 | **Failure mode** | Fail closed. The route returns a generic `502 {"error":"plan-unavailable"}` and the UI shows one retry message. A partial or unvalidated plan is never rendered, and upstream errors are never echoed (only a reason code is logged on the server). |
 | **Missing data** | Gaps travel as codes (e.g. `measured:no-station-in-radius`). The plan must list exactly those codes, and the UI translates them. It cannot fill a gap: there is no number it could use. |
 | **Route hygiene** | POST only; JSON only; body ≤ 2 KB; known city, language and profile values; profile city must match. Generic 400 otherwise. Profiles are canonicalised (distance to 0.5 km, no distance or time without a commute) so the number of distinct plans is bounded. Responses are cached server-side per (city, language, profile, 15-minute bucket) and sent `private, no-store`. **Pending at deploy:** a per-visitor rate limit on `/api/plan` and `/api/grounding` in the Vercel Firewall. |

@@ -52,7 +52,8 @@ export function Home({ profile, onEdit }: { profile: HouseholdProfile; onEdit: (
         </div>
       </header>
 
-      <p className="mt-5 flex flex-wrap gap-x-5 gap-y-1 text-sm">
+      {/* The measured/forecast split in one plain line; the marks match the boxes below. */}
+      <p className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted">
         <span className="flex items-center gap-2">
           <MeasuredMark />
           {t.key.measured}
@@ -62,7 +63,6 @@ export function Home({ profile, onEdit }: { profile: HouseholdProfile; onEdit: (
           {t.key.forecast}
         </span>
       </p>
-      <p className="mt-1 text-sm text-muted">{t.key.explainer}</p>
 
       {load.status === "loading" && <p className="mt-8 text-muted">{t.common.loading}</p>}
       {load.status === "error" && (
@@ -74,16 +74,18 @@ export function Home({ profile, onEdit }: { profile: HouseholdProfile; onEdit: (
         </div>
       )}
       {load.status === "ready" && (
-        <div className="mt-5 space-y-5">
-          <MeasuredPanel snapshot={load.snapshot} now={load.now} />
+        <div className="mt-4 space-y-5">
+          <MeasuredPanel snapshot={load.snapshot} now={load.now} city={city?.names[locale] ?? ""} />
           <WindowPanel forecast={load.snapshot.forecast} now={load.now} departureHour={profile.commute.mode === "none" ? undefined : profile.commute.departureHour} />
           <PlanPanel profile={profile} />
         </div>
       )}
 
       <footer className="mt-10 border-t border-ink/15 pt-4 text-sm text-muted">
-        <h2 className="font-semibold text-ink">{t.sources.title}</h2>
-        <ul className="mt-2 space-y-1">
+        <details>
+          <summary className="cursor-pointer font-semibold text-ink">{t.sources.title}</summary>
+          <p className="mt-2">{t.sources.neverMixed}</p>
+          <ul className="mt-2 space-y-1">
           <li>
             <a className="underline underline-offset-2" href={CITATIONS["openaq-v3"].url}>
               {t.sources.openaq}
@@ -104,7 +106,8 @@ export function Home({ profile, onEdit }: { profile: HouseholdProfile; onEdit: (
               {t.sources.cams}
             </a>
           </li>
-        </ul>
+          </ul>
+        </details>
       </footer>
     </main>
   );

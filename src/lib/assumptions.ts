@@ -37,7 +37,8 @@ export type AssumptionId =
   | "plan-concurrency"
   | "plan-model-budget"
   | "distance-rounding"
-  | "plan-health-vocabulary";
+  | "plan-health-vocabulary"
+  | "plan-timeframe-binding";
 
 export const ASSUMPTIONS: Readonly<Record<AssumptionId, Assumption>> = {
   "station-radius": {
@@ -181,6 +182,13 @@ export const ASSUMPTIONS: Readonly<Record<AssumptionId, Assumption>> = {
     value: "Broad English + Hindi health/medical/safety/exposure word list",
     rationale: "Any match rejects the whole plan. Deliberately over-inclusive: a false positive costs a retry, a false negative would put an unsourced health claim on screen. The CPCB statement is shown by the UI, never by the plan.",
     usedIn: ["src/lib/plan/validate.ts"],
+  },
+  "plan-timeframe-binding": {
+    id: "plan-timeframe-binding",
+    value: "Per sentence: 24-hour AQI needs '24 hours' and no 'now'; latest reading no 'now'/forecast; forecast numbers need 'forecast'",
+    rationale:
+      "Units alone let a real number be quoted as the wrong thing (the 24-hour AQI written as 'current air quality'). Each measured or predicted number carries its role, and the sentence quoting it must fit that role. Word lists are broad on purpose: a false positive costs a retry, a false negative misstates a number.",
+    usedIn: ["src/lib/plan/validate.ts", "src/lib/plan/packet.ts"],
   },
   "window-routine-stretch": {
     id: "window-routine-stretch",

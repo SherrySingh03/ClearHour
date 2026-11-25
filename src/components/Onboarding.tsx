@@ -86,13 +86,18 @@ export function Onboarding({ initial, onDone }: { initial: HouseholdProfile | nu
         <LanguageSwitch />
       </header>
 
-      <div className="mt-10">
-        <h1 className="type-condensed text-4xl leading-tight font-semibold">{o.title}</h1>
-        <p className="mt-2 text-muted">{o.privacy}</p>
-      </div>
+      {i === 0 ? (
+        <div className="mt-10">
+          <h1 className="type-condensed text-4xl leading-tight font-semibold">{o.title}</h1>
+          <p className="mt-2 text-lg">{o.intro}</p>
+          <p className="mt-1 text-sm text-muted">{o.privacy}</p>
+        </div>
+      ) : (
+        <h1 className="sr-only">{o.title}</h1>
+      )}
 
       <form
-        className="mt-8 flex flex-1 flex-col"
+        className={`${i === 0 ? "mt-8" : "mt-6"} flex flex-1 flex-col`}
         onSubmit={(e) => {
           e.preventDefault();
           advance();
@@ -107,7 +112,7 @@ export function Onboarding({ initial, onDone }: { initial: HouseholdProfile | nu
 
         <div className="mt-6 flex-1">
           {step === "city" && (
-            <Question legend={o.city.question} hint={o.city.hint}>
+            <Question legend={o.city.question} why={o.city.why}>
               <select
                 value={draft.cityId}
                 onChange={(e) => set({ cityId: e.target.value })}
@@ -125,17 +130,17 @@ export function Onboarding({ initial, onDone }: { initial: HouseholdProfile | nu
           )}
 
           {step === "commute" && (
-            <Question legend={o.commute.question}>
+            <Question legend={o.commute.question} why={o.commute.why}>
               <Choices name="mode" value={draft.mode} options={COMMUTE_MODES.map((m) => ({ value: m, label: o.commute.modes[m] }))} onChange={(mode) => set({ mode })} />
               {draft.mode !== null && draft.mode !== "none" && (
-                <div className="mt-6 grid gap-5 sm:grid-cols-2">
+                <div className="mt-7 grid gap-6 border-t border-ink/15 pt-5">
                   <NumberField label={o.commute.distance} hint={o.commute.distanceHint} unit={t.common.kmUnit} value={draft.km} onChange={(km) => set({ km })} />
                   <label className="block">
-                    <span className="font-medium">{o.commute.departure}</span>
+                    <span className="text-lg font-medium">{o.commute.departure}</span>
                     <select
                       value={draft.departureHour ?? ""}
                       onChange={(e) => set({ departureHour: e.target.value === "" ? null : Number(e.target.value) })}
-                      className="mt-1 w-full rounded-lg border border-ink/30 bg-station px-3 py-2.5"
+                      className="mt-1 w-full max-w-xs rounded-lg border border-ink/30 bg-station px-3 py-2.5"
                     >
                       <option value="">{o.commute.departureUnset}</option>
                       {DEPARTURE_HOURS.map((h) => (
@@ -152,19 +157,19 @@ export function Onboarding({ initial, onDone }: { initial: HouseholdProfile | nu
           )}
 
           {step === "cooking" && (
-            <Question legend={o.cooking.question}>
+            <Question legend={o.cooking.question} why={o.cooking.why}>
               <Choices name="fuel" value={draft.cookingFuel} options={COOKING_FUELS.map((v) => ({ value: v, label: o.cooking.fuels[v] }))} onChange={(cookingFuel) => set({ cookingFuel })} />
             </Question>
           )}
 
           {step === "household" && (
-            <Question legend={o.household.question} hint={o.household.hint}>
+            <Question legend={o.household.question} why={o.household.why}>
               <YesNo name="household" value={draft.hasChildrenOrElderly} onChange={(v) => set({ hasChildrenOrElderly: v })} />
             </Question>
           )}
 
           {step === "purifier" && (
-            <Question legend={o.purifier.question}>
+            <Question legend={o.purifier.question} why={o.purifier.why}>
               <YesNo name="purifier" value={draft.hasAirPurifier} onChange={(v) => set({ hasAirPurifier: v })} />
             </Question>
           )}
@@ -183,11 +188,12 @@ export function Onboarding({ initial, onDone }: { initial: HouseholdProfile | nu
   );
 }
 
-function Question({ legend, hint, children }: { legend: string; hint?: string; children: ReactNode }) {
+/** One question per screen: the question, then why we ask it, then the answers. */
+function Question({ legend, why, children }: { legend: string; why: string; children: ReactNode }) {
   return (
     <fieldset>
-      <legend className="type-condensed text-3xl leading-tight font-semibold">{legend}</legend>
-      {hint && <p className="mt-2 text-muted">{hint}</p>}
+      <legend className="type-condensed text-3xl leading-tight font-semibold text-balance">{legend}</legend>
+      <p className="mt-2 max-w-prose border-l-2 border-ink/20 pl-3 text-muted">{why}</p>
       <div className="mt-5">{children}</div>
     </fieldset>
   );
@@ -231,11 +237,11 @@ function NumberField({ label, hint, unit, value, onChange }: { label: string; hi
   const id = useId();
   return (
     <div>
-      <label htmlFor={id} className="font-medium">
+      <label htmlFor={id} className="text-lg font-medium">
         {label}
       </label>
-      <div className="mt-1 flex items-center rounded-lg border border-ink/30 bg-station pr-3">
-        <input id={id} inputMode="decimal" value={value} onChange={(e) => onChange(e.target.value)} className="w-full rounded-lg bg-transparent px-3 py-2.5 outline-none" />
+      <div className="mt-1 flex max-w-xs items-center rounded-lg border border-ink/30 bg-station pr-3 has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-sky">
+        <input id={id} inputMode="decimal" value={value} onChange={(e) => onChange(e.target.value)} className="w-full rounded-lg bg-transparent px-3 py-2.5 focus-visible:outline-none" />
         <span className="text-muted">{unit}</span>
       </div>
       <span className="mt-1 block text-sm text-muted">{hint}</span>

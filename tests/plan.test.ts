@@ -153,3 +153,59 @@ describe("number gate cannot be bypassed", () => {
     expect(check("Taking the bus avoids about 2.3 kg of CO₂ on a working day.").ok).toBe(true);
   });
 });
+
+describe("numbers are bound to what they are (timeframe), not just to a unit", () => {
+  const { allowance } = buildPlanInput(input);
+  const check = (note: string) => validatePlan(withStep(2, note), allowance);
+  const forecast = allowance.bindings.filter((b) => b.role === "forecast");
+
+  it("records the role of each measured and predicted number", () => {
+    expect(allowance.bindings).toEqual(
+      expect.arrayContaining([
+        { value: "220", unit: null, role: "aqi-24h" },
+        { value: "45", unit: "ugm3", role: "latest-reading" },
+      ]),
+    );
+    expect(forecast.map((b) => b.unit).sort()).toEqual(["pct", "ugm3"]);
+  });
+
+  it("rejects the 24-hour AQI described as current air quality", () => {
+    expect(check("Delhi's current air quality is at 220, so stay in.")).toMatchObject({ ok: false, reason: "number-role" });
+    expect(check("The AQI is 220 right now.")).toMatchObject({ ok: false, reason: "number-role" });
+    // No timeframe at all is also a mismatch: 220 is a 24-hour value.
+    expect(check("Delhi's AQI is 220.")).toMatchObject({ ok: false, reason: "number-role" });
+  });
+
+  it("accepts the AQI when the sentence says it is a 24-hour value", () => {
+    expect(check("Delhi's 24-hour AQI is 220.").ok).toBe(true);
+    expect(check("Over the last 24 hours the AQI was 220, which CPCB calls Poor.").ok).toBe(true);
+  });
+
+  it("binds per sentence: a 24-hour phrase in another sentence does not cover it", () => {
+    expect(check("The window is over 24 hours old. The AQI is 220.")).toMatchObject({ ok: false, reason: "number-role" });
+  });
+
+  it("rejects the latest reading presented as 'now' or as a forecast", () => {
+    expect(check("PM2.5 is 45 µg/m³ now.")).toMatchObject({ ok: false, reason: "number-role" });
+    expect(check("The forecast says 45 µg/m³ in the morning.")).toMatchObject({ ok: false, reason: "number-role" });
+  });
+
+  it("rejects a forecast number not called a forecast, or mixed with a reading", () => {
+    const drop = forecast.find((b) => b.unit === "ugm3")!.value;
+    expect(check(`Leaving early means ${drop} µg/m³ less fine dust.`)).toMatchObject({ ok: false, reason: "number-role" });
+    expect(check(`The station reading and forecast differ by ${drop} µg/m³.`)).toMatchObject({ ok: false, reason: "number-role" });
+    expect(check(`The forecast shows about ${drop} µg/m³ less fine dust early on.`).ok).toBe(true);
+  });
+
+  it("Hindi: rejects अभी / वर्तमान with the AQI, accepts 24 घंटे", () => {
+    const hi = buildPlanInput({ ...input, locale: "hi" }).allowance;
+    const hiCheck = (note: string) => validatePlan({ ...withStep(2, note), headline: "दिल्ली में आज सुबह जल्दी निकलें।", steps: [{ kind: "swap", refId: "commute:car-petrol->bus", note }] }, hi);
+    expect(hiCheck("दिल्ली का AQI अभी 220 है।")).toMatchObject({ ok: false, reason: "number-role" });
+    expect(hiCheck("दिल्ली की वर्तमान वायु गुणवत्ता २२० है।")).toMatchObject({ ok: false, reason: "number-role" });
+    expect(hiCheck("पिछले 24 घंटों में दिल्ली का AQI 220 रहा।").ok).toBe(true);
+  });
+
+  it("clock times and other units never trip the binding", () => {
+    expect(check("Leave at 4:45 am; the bus avoids about 2.3 kg of CO₂ on a working day.").ok).toBe(true);
+  });
+});

@@ -18,7 +18,7 @@ import { swapsFor, type Swap, type SwapId } from "../sourced/swaps";
 import { bestWindow } from "./window";
 import { describeAge, describeWindow } from "../view/describe";
 import { extractNumbers, extractUnitNumbers } from "./numbers";
-import type { GapCode, PlanAllowance, RefDetail } from "./types";
+import type { GapCode, NumberBinding, PlanAllowance, RefDetail } from "./types";
 import type { Formatters, UiStrings } from "../i18n";
 
 export interface PlanInput {
@@ -53,6 +53,7 @@ export function buildPlanInput({ snapshot, profile, locale, now }: PlanInput) {
   const t = getUiStrings(locale);
   const f = getFormatters(locale);
   const gaps: GapCode[] = [];
+  const bindings: NumberBinding[] = [];
 
   // Measured
   let measured: Record<string, unknown>;
@@ -64,14 +65,21 @@ export function buildPlanInput({ snapshot, profile, locale, now }: PlanInput) {
     const pm25 = snapshot.measured.data.latest.pm25;
     const aqi = snapshot.measured.data.naqi24h.pm25;
     if (!aqi.ok) gaps.push(`aqi:${aqi.reason}`);
+    if (pm25) bindings.push({ value: extractNumbers(f.number(pm25.value))[0]!, unit: "ugm3", role: "latest-reading" });
+    if (aqi.ok) bindings.push({ value: extractNumbers(f.number(aqi.data.subIndex))[0]!, unit: null, role: "aqi-24h" });
+    // Key names carry the timeframe, so the model sees what each value is.
     measured = {
       available: true,
       station: snapshot.coverage.station.name,
-      distance: t.common.km({ km: f.number(snapshot.coverage.distanceKm, 1) }),
-      latestPm25: pm25 ? `${f.number(pm25.value)} ${t.common.unitUgm3}` : null,
-      readingTime: pm25 ? f.time(pm25.provenance.observedAt.utc) : null,
-      readingAge: pm25 ? describeAge(pm25.provenance.observedAt.utc, now, t) : null,
-      aqi24h: aqi.ok
+      distanceFromCityCentre: t.common.km({ km: f.number(snapshot.coverage.distanceKm, 1) }),
+      latestSingleHourReading: pm25
+        ? {
+            pm25: `${f.number(pm25.value)} ${t.common.unitUgm3}`,
+            readingTime: f.time(pm25.provenance.observedAt.utc),
+            readingAge: describeAge(pm25.provenance.observedAt.utc, now, t),
+          }
+        : null,
+      aqi24hAverage: aqi.ok
         ? { label: t.measured.aqiTitle, value: f.number(aqi.data.subIndex), category: t.categories[aqi.data.category] }
         : { available: false, gap: `aqi:${aqi.reason}` },
     };
@@ -88,7 +96,13 @@ export function buildPlanInput({ snapshot, profile, locale, now }: PlanInput) {
     const result = bestWindow({ forecast: snapshot.forecast.data, now, ...(departureHour === undefined ? {} : { departureHour }) });
     const view = describeWindow(result, t, f);
     windowAvailable = view.showCaveat;
-    forecast = { available: true, isModelForecast: true, verdict: result.verdict, statement: view.headline, details: view.details, caveat: windowAvailable ? t.window.caveat : null };
+    // Forecast drops (µg/m³ and %) are predictions, and must be quoted as such.
+    for (const line of view.details) {
+      const u = extractUnitNumbers(line);
+      u.ugm3.forEach((value) => bindings.push({ value, unit: "ugm3", role: "forecast" }));
+      u.pct.forEach((value) => bindings.push({ value, unit: "pct", role: "forecast" }));
+    }
+    forecast = { available: true, isModelPrediction: true, verdict: result.verdict, statement: view.headline, details: view.details, caveat: windowAvailable ? t.window.caveat : null };
   }
 
   // Household
@@ -155,6 +169,7 @@ export function buildPlanInput({ snapshot, profile, locale, now }: PlanInput) {
     locale,
     numbers,
     unitNumbers,
+    bindings,
     guidanceIds: new Set(guidance.map((g) => g.item.id)),
     swapIds: new Set(swaps.map((s) => s.id)),
     windowAvailable,

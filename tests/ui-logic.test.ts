@@ -3,7 +3,7 @@ import { getFormatters, getUiStrings, LOCALES } from "@/lib/i18n";
 import { makeForecastPoint, type ForecastSeries } from "@/lib/grounding/types";
 import { bestWindow } from "@/lib/plan/window";
 import { parseProfile } from "@/lib/profile/storage";
-import { describeAge, describeWindow } from "@/lib/view/describe";
+import { describeAge, describeWindow, uniqueCitations } from "@/lib/view/describe";
 
 const EARLY = new Date("2026-11-24T22:30:00Z"); // 04:00 IST
 
@@ -63,6 +63,24 @@ describe.each(LOCALES)("window sentences (%s)", (locale) => {
     expect(describeWindow({ verdict: "no-forecast" }, t, f)).toEqual({ headline: t.window.unavailable, details: [], showCaveat: false });
   });
 
+  it("late evening (forecast present, no full stretch left): says it's too late today, never 'no forecast'", () => {
+    const late = new Date("2026-11-25T14:38:00Z"); // 20:08 IST, the live case that showed the bug
+    const r = bestWindow({ forecast: series(() => 150), now: late });
+    expect(r.verdict).toBe("insufficient-forecast");
+    const v = describeWindow(r, t, f);
+    expect(v.headline).toBe(t.window.tooLate);
+    expect(v.headline).not.toBe(t.window.unavailable);
+    expect(v.details).toEqual([t.window.tooLateDetail({ from: f.clockHour(5), to: f.clockHour(22) })]);
+    expect(v.showCaveat).toBe(false);
+  });
+
+  it("drop lines name what they are compared with: the usual departure, or a typical stretch", () => {
+    const vsRoutine = describeWindow(bestWindow({ forecast: series((h) => (h < 8 ? 290 : 400)), now: EARLY, departureHour: 9 }), t, f);
+    expect(vsRoutine.details[0]).toBe(t.window.dropVsRoutine({ drop: f.number(110), pct: f.number(27.5) }));
+    const vsTypical = describeWindow(bestWindow({ forecast: series((h) => (h >= 6 && h < 9 ? 70 : 200)), now: EARLY }), t, f);
+    expect(vsTypical.details[0]).toBe(t.window.dropVsTypical({ drop: f.number(130), pct: f.number(65) }));
+  });
+
   it("every UI string is non-empty", () => {
     const walk = (x: unknown): void => {
       if (typeof x === "string") expect(x.trim().length).toBeGreaterThan(0);
@@ -88,8 +106,9 @@ describe("relative age", () => {
   it.each([
     ["2026-11-25T07:59:30Z", "just now"],
     ["2026-11-25T07:35:00Z", "25 min ago"],
-    ["2026-11-25T05:00:00Z", "3 hours ago"],
-    ["2026-11-25T07:00:00Z", "1 hour ago"],
+    ["2026-11-25T05:00:00Z", "about 3 hours ago"],
+    ["2026-11-25T07:00:00Z", "about 1 hour ago"],
+    ["2026-11-25T04:10:00Z", "about 4 hours ago"], // 3 h 50 min: rounded, never understated as "3 hours"
   ])("%s → %s", (iso, want) => expect(describeAge(iso, now, t)).toBe(want));
 });
 
@@ -114,4 +133,13 @@ describe("profile storage validation", () => {
     ["missing field", { ...good, hasAirPurifier: undefined }],
     ["garbage", "not a profile"],
   ])("rejects %s (back to onboarding, no crash)", (_, raw) => expect(parseProfile(raw)).toBeNull());
+});
+
+describe("plan source links", () => {
+  it("one link per document, even when several locators or factors cite it", () => {
+    expect(uniqueCitations(["mohfw-air-advisory-2025", "mohfw-air-advisory-2025", null, "ighgp-road-2015", "ighgp-road-2015"])).toEqual([
+      "mohfw-air-advisory-2025",
+      "ighgp-road-2015",
+    ]);
+  });
 });

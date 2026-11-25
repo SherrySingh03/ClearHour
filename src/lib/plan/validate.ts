@@ -13,13 +13,16 @@
  *  - numbers: no spelled-out quantities; no digits from other scripts or
  *    numeric symbols; every numeral appears in the input; and a number next
  *    to a unit (µg/m³, kg, %) appeared with that same unit in the input
+ *  - timeframes: a sentence quoting a measured or predicted number says what
+ *    it is (24-hour AQI as 24-hour and never "now"; the latest reading never
+ *    "now" or a forecast; a forecast number as a forecast)
  *  - language: written in the requested language
  */
 
 import { z } from "zod";
 import { missing, ok, type Grounded } from "../grounding/types";
-import { containsNumberWord, extractNumbers, extractUnitNumbers, hasUnsupportedNumerals } from "./numbers";
-import type { Plan, PlanAllowance } from "./types";
+import { containsNumberWord, extractNumbers, extractUnitNumbers, hasUnsupportedNumerals, normalise, numberOccurrences, sentences } from "./numbers";
+import type { NumberBinding, NumberRole, Plan, PlanAllowance } from "./types";
 
 export const LIMITS = { headline: 160, note: 240, maxSteps: 5 } as const;
 
@@ -33,6 +36,7 @@ export type PlanRejection =
   | "health-claim"
   | "number-word"
   | "unknown-number"
+  | "number-role"
   | "wrong-language";
 
 const PlanSchema = z.object({
@@ -55,6 +59,39 @@ const HEALTH_HI =
   /(स्वास्थ्य|सेहत|स्वस्थ|अस्वस्थ|दमा|अस्थमा|फेफड़|फेफड|हृदय|दिल(?!्ली)|सांस|साँस|श्वास|खांसी|खाँसी|बीमार|रोग|लक्षण|कैंसर|मौत|मृत्यु|डॉक्टर|अस्पताल|दवा|इलाज|उपचार|गर्भ|संपर्क|सुरक्षित|असुरक्षित|हानिकारक|ज़हरीला|जहरीला|खतरा|ख़तरा|जोखिम)/;
 
 const LINK = /(https?:\/\/|www\.)/i;
+
+/**
+ * Timeframe words. A measured value is never "now": the latest reading is
+ * hours old and the AQI is a 24-hour average. Broad on purpose, like the
+ * health list: a false positive costs a retry.
+ */
+const H24 = /24\s*-?\s*(hours?|hrs?|घंटे|घंटा|घंटों)/i;
+const NOW = /\b(now|current\w*|presently|at the moment|this moment)\b|अभी|इस समय|इस वक़्त|इस वक्त|वर्तमान|फ़िलहाल|फिलहाल|मौजूदा/i;
+const FORECAST = /\b(forecast\w*|predict\w*|expect\w*|model\w*|projected)\b|पूर्वानुमान|अनुमान|संभावना/i;
+const MEASURED = /\b(reading\w*|measured|measurement\w*|monitor\w*|station\w*|recorded)\b|रीडिंग|मापा|मापी|मापे|मॉनिटर|स्टेशन|दर्ज/i;
+
+const ROLE_OK: Readonly<Record<NumberRole, (sentence: string) => boolean>> = {
+  "aqi-24h": (x) => H24.test(x) && !NOW.test(x) && !FORECAST.test(x),
+  "latest-reading": (x) => !NOW.test(x) && !FORECAST.test(x),
+  forecast: (x) => FORECAST.test(x) && !MEASURED.test(x),
+};
+
+/**
+ * The first number in `text` whose sentence misstates what it is, or null.
+ * A number can match several bindings (the same value shown twice); the
+ * sentence passes if it fits any one of them. A unitless number matches a
+ * binding of any unit; a number with another unit (km, kg, hours) matches none.
+ */
+function misboundNumber(text: string, bindings: readonly NumberBinding[]): string | null {
+  for (const raw of sentences(text)) {
+    const sentence = normalise(raw);
+    for (const occ of numberOccurrences(sentence)) {
+      const candidates = bindings.filter((b) => b.value === occ.value && (occ.unit === null || b.unit === occ.unit));
+      if (candidates.length > 0 && !candidates.some((b) => ROLE_OK[b.role](sentence))) return `${occ.value} (${candidates.map((b) => b.role).join("|")})`;
+    }
+  }
+  return null;
+}
 
 /** Share of letters that are Devanagari. */
 function devanagariShare(text: string): number {
@@ -97,6 +134,8 @@ export function validatePlan(raw: unknown, a: PlanAllowance): Grounded<Plan, Pla
       const misused = units[unit].find((n) => !a.unitNumbers[unit].has(n));
       if (misused !== undefined) return missing("unknown-number", `${misused} ${unit}`);
     }
+    const misbound = misboundNumber(text, a.bindings);
+    if (misbound !== null) return missing("number-role", misbound);
   }
 
   const share = devanagariShare(texts.join(" "));
