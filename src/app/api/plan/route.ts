@@ -9,6 +9,7 @@
 
 import { NextResponse } from "next/server";
 import { parsePlanRequest, timeBucket } from "@/lib/plan/request";
+import { planLimiter } from "@/lib/plan/limiter";
 import { getPlan, planFailureReason } from "@/lib/plan/server";
 
 const NO_STORE = { "cache-control": "no-store" };
@@ -22,6 +23,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "plan-unavailable" }, { status: 502, headers: NO_STORE });
   }
 
+  const release = planLimiter.tryAcquire();
+  if (!release) {
+    console.warn("[plan]", JSON.stringify({ reason: "busy" }));
+    return NextResponse.json({ error: "plan-unavailable" }, { status: 502, headers: NO_STORE });
+  }
+
   try {
     const plan = await getPlan(parsed.cityId, parsed.locale, parsed.profile, timeBucket(new Date()));
     // The plan is derived from a private household profile: never cache it in shared caches.
@@ -30,5 +37,7 @@ export async function POST(req: Request) {
     const reason = planFailureReason(e);
     console.warn("[plan]", JSON.stringify({ reason, locale: parsed.locale, city: parsed.cityId }));
     return NextResponse.json({ error: "plan-unavailable" }, { status: 502, headers: NO_STORE });
+  } finally {
+    release();
   }
 }

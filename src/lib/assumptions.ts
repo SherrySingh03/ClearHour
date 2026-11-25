@@ -34,6 +34,8 @@ export type AssumptionId =
   | "window-materially-cleaner"
   | "window-routine-stretch"
   | "plan-time-bucket"
+  | "plan-concurrency"
+  | "plan-model-budget"
   | "distance-rounding"
   | "plan-health-vocabulary";
 
@@ -155,6 +157,18 @@ export const ASSUMPTIONS: Readonly<Record<AssumptionId, Assumption>> = {
     value: "Nearest 0.5 km",
     rationale: "Commute distance is a rough guess, so 0.5 km precision loses nothing. It also bounds how many distinct profiles, and so distinct cached Gemini plans, a caller can create.",
     usedIn: ["src/lib/profile/storage.ts", "src/components/Onboarding.tsx"],
+  },
+  "plan-concurrency": {
+    id: "plan-concurrency",
+    value: "4 plan generations at once per server instance",
+    rationale: "Bounds Gemini spend and open connections. When full, the route turns requests away immediately with its generic 502; the UI offers a retry. Cache hits release their slot within milliseconds.",
+    usedIn: ["src/lib/plan/limiter.ts", "src/app/api/plan/route.ts"],
+  },
+  "plan-model-budget": {
+    id: "plan-model-budget",
+    value: "50 s total per plan; fallback model only on 5xx/timeout with ≥ 15 s left",
+    rationale: "Live plans took 5–18 s. One shared deadline stops primary + fallback from doubling the time a request can hold. No fallback on 429 (quota), which a second model would only spend faster.",
+    usedIn: ["src/lib/plan/gemini.ts"],
   },
   "plan-time-bucket": {
     id: "plan-time-bucket",
