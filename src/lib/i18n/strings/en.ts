@@ -64,6 +64,7 @@ export interface UiStrings {
     readonly aqiTitle: string;
     readonly aqiBasis: Fn<{ hours: number }>;
     readonly aqiCapped: string;
+    readonly aqiVsLatest: string;
     readonly healthSource: string;
     readonly noPm25Now: string;
     readonly reasons: Readonly<Record<MeasuredMissingReason, string>>;
@@ -106,6 +107,21 @@ export interface UiStrings {
     readonly cpcb: string;
     readonly openMeteo: string;
     readonly cams: string;
+  };
+  readonly swaps: {
+    readonly targets: Readonly<Record<"bus" | "suburban-rail" | "metro" | "walk-cycle" | "png" | "lpg", string>>;
+    readonly kgPerDay: Fn<{ kg: string }>;
+    readonly percentLess: Fn<{ pct: string }>;
+  };
+  readonly plan: {
+    readonly title: string;
+    readonly byline: string;
+    readonly loading: string;
+    readonly failed: string;
+    readonly retry: string;
+    readonly gapsIntro: string;
+    readonly seeForecast: string;
+    readonly source: Fn<{ title: string }>;
   };
   readonly errors: { readonly network: string };
 }
@@ -187,6 +203,7 @@ export const en: UiStrings = {
     aqiTitle: "24-hour CPCB AQI from PM2.5",
     aqiBasis: ({ hours }) => `Calculated from ${hours} hourly readings at this station, using CPCB's formula.`,
     aqiCapped: "At the top of the 0–500 scale",
+    aqiVsLatest: "The AQI averages the last 24 hours of readings. The number above is the latest single reading, so the two can differ.",
     healthSource: "CPCB health statement for this category",
     noPm25Now: "No recent PM2.5 reading from this station.",
     reasons: {
@@ -258,6 +275,28 @@ export const en: UiStrings = {
     cpcb: "AQI formula and health statements: CPCB National Air Quality Index (2014)",
     openMeteo: "Forecast: Open-Meteo (CC BY 4.0)",
     cams: "Generated using Copernicus Atmosphere Monitoring Service information",
+  },
+  swaps: {
+    targets: {
+      bus: "Take the bus",
+      "suburban-rail": "Take the local train",
+      metro: "Take the metro",
+      "walk-cycle": "Walk or cycle",
+      png: "Switch to piped gas (PNG)",
+      lpg: "Switch to LPG",
+    },
+    kgPerDay: ({ kg }) => `${kg} kg less CO₂ per working day`,
+    percentLess: ({ pct }) => `${pct}% less CO₂ for the same heat`,
+  },
+  plan: {
+    title: "Today's plan",
+    byline: "Written by Gemini using only the readings, forecast and cited guidance on this page, and checked before it's shown.",
+    loading: "Preparing today's plan…",
+    failed: "Today's plan couldn't be prepared. The data above is still accurate.",
+    retry: "Try again",
+    gapsIntro: "This plan has no data for:",
+    seeForecast: "See the forecast above",
+    source: ({ title }) => `Source: ${title}`,
   },
   errors: { network: "Couldn't load today's air. Check your connection and try again." },
 };

@@ -70,6 +70,8 @@ These are **Clearhour's own judgment calls, not published standards**. The sourc
 | `window-indicative-category` | CPCB category of a 3-h forecast mean is "indicative" | Breakpoints are 24-hour. A comparison aid, never shown as an AQI. |
 | `window-materially-cleaner` | Better category **or** (≥ 30 µg/m³ **and** ≥ 25% lower PM2.5) | Product rule set by the project owner. The OR keeps big drops visible when everything is Severe. If nothing clears the bar, no winner is named. |
 | `window-routine-stretch` | 3-h stretch from the last point at or before departure | Forecast points fall on the half hour in IST. |
+| `plan-time-bucket` | 15 minutes | Plan cache key granularity. The best window depends on time of day; this bounds Gemini calls. |
+| `plan-health-vocabulary` | Broad English + Hindi health/medical/safety/exposure word list | Any match rejects the whole plan. A false positive costs a retry; a false negative would show an unsourced health claim. |
 
 ## Running
 
@@ -84,3 +86,18 @@ npm run dev                       # GET /api/grounding?city=delhi
 ```
 
 Without `OPENAQ_API_KEY` the measured side fails closed and only the labelled forecast is returned.
+
+## GenAI architecture
+
+| | |
+|---|---|
+| **Model** | Google Gemini, `gemini-3.8-flash` (listed as Stable on Google's models page, checked 2026-11-25), via the official `@google/genai` SDK. Override with `GEMINI_MODEL`. |
+| **Where it sits** | Server only (`src/lib/plan/gemini.ts`, imported behind `server-only`). Called from `POST /api/plan` after the grounding snapshot is built. The key never reaches the browser. |
+| **Its one job** | Synthesis and explanation: choose which already-grounded items matter today for this household, order them, and explain them in plain English or Hindi. |
+| **What it receives** | A packet (`src/lib/plan/packet.ts`): the measured reading or its gap code, the forecast's best-window verdict (already computed), the household profile, the selected sourced guidance and the computed swaps. Every number in it is a display string the page itself shows. It does **not** receive CPCB health statements. |
+| **What it returns** | Structured JSON only (`responseJsonSchema`): a headline, 1–5 steps that each reference an input id (`window`, a guidance id or a swap id) with a short note, and the list of acknowledged data gaps. |
+| **What it may never produce** | A pollution number, an emission factor, a health threshold, a health or medical claim, a safety or exposure claim, or any number not already in its input. |
+| **How that is enforced** | `src/lib/plan/validate.ts` checks every plan before it is shown: schema and lengths, ids exist and aren't repeated, no window step without a forecast, exactly the input's gaps acknowledged, no links, no health vocabulary (English and Hindi), no spelled-out quantities, every numeral present in the input, right language. **Any failure rejects the whole plan.** |
+| **Failure mode** | Fail closed. The route returns a generic `502 {"error":"plan-unavailable"}` and the UI shows one retry message. A partial or unvalidated plan is never rendered, and upstream errors are never echoed (only a reason code is logged on the server). |
+| **Missing data** | Gaps travel as codes (e.g. `measured:no-station-in-radius`). The plan must list exactly those codes, and the UI translates them. It cannot fill a gap: there is no number it could use. |
+| **Route hygiene** | POST only; JSON only; body ≤ 2 KB; known city, language and profile values; profile city must match. Generic 400 otherwise. Responses are cached server-side per (city, language, profile, 15-minute bucket) and sent `private, no-store`. |

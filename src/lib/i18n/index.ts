@@ -14,9 +14,10 @@ export function getUiStrings(locale: Locale): UiStrings {
 
 /** Locale-aware number and time formatting. Times are always shown in IST. */
 export function getFormatters(locale: Locale) {
-  const tag = LOCALE_META[locale].intl;
-  const time = new Intl.DateTimeFormat(tag, { hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" });
-  const hourOnly = new Intl.DateTimeFormat(tag, { hour: "numeric", timeZone: "Asia/Kolkata" });
+  const { intl: tag, dayPeriodWords } = LOCALE_META[locale];
+  const period = dayPeriodWords ? ({ dayPeriod: "short" } as const) : {};
+  const time = new Intl.DateTimeFormat(tag, { hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata", ...period });
+  const hourOnly = new Intl.DateTimeFormat(tag, { hour: "numeric", timeZone: "Asia/Kolkata", ...period });
   return {
     number: (n: number, maxFractionDigits = 0) =>
       new Intl.NumberFormat(tag, { maximumFractionDigits: maxFractionDigits }).format(n),

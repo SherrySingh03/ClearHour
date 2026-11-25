@@ -11,9 +11,10 @@ export type Locale = (typeof LOCALES)[number];
 
 export const DEFAULT_LOCALE: Locale = "en";
 
-export const LOCALE_META: Readonly<Record<Locale, { readonly nativeName: string; readonly htmlLang: string; readonly intl: string }>> = {
-  en: { nativeName: "English", htmlLang: "en", intl: "en-IN" },
-  hi: { nativeName: "हिन्दी", htmlLang: "hi", intl: "hi-IN" },
+/** dayPeriodWords: show "सुबह 6:30" style instead of "6:30 am" (Intl dayPeriod). */
+export const LOCALE_META: Readonly<Record<Locale, { readonly nativeName: string; readonly htmlLang: string; readonly intl: string; readonly dayPeriodWords: boolean }>> = {
+  en: { nativeName: "English", htmlLang: "en", intl: "en-IN", dayPeriodWords: false },
+  hi: { nativeName: "हिन्दी", htmlLang: "hi", intl: "hi-IN", dayPeriodWords: true },
 };
 
 export const isLocale = (x: unknown): x is Locale => typeof x === "string" && (LOCALES as readonly string[]).includes(x);

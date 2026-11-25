@@ -102,7 +102,8 @@ export function MeasuredPanel({ snapshot, now }: { snapshot: GroundingSnapshot; 
                 {t.healthStatementIsTranslation && <span className="block">{t.healthStatementIsTranslation}</span>}
               </figcaption>
             </figure>
-            <p className="mt-2 text-xs text-muted">{m.aqiBasis({ hours: naqi.data.hoursObserved })}</p>
+            <p className="mt-3 text-sm">{m.aqiVsLatest}</p>
+            <p className="mt-1 text-xs text-muted">{m.aqiBasis({ hours: naqi.data.hoursObserved })}</p>
           </div>
         ) : (
           <p className="mt-1 text-sm text-muted">{m.naqiReasons[naqi.reason]}</p>

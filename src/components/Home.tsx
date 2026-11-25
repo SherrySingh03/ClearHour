@@ -8,6 +8,7 @@ import type { HouseholdProfile } from "@/lib/profile/types";
 import { LanguageSwitch } from "./LanguageSwitch";
 import { useLocale } from "./LocaleContext";
 import { MeasuredMark, MeasuredPanel } from "./MeasuredPanel";
+import { PlanPanel } from "./PlanPanel";
 import { ForecastMark, WindowPanel } from "./WindowPanel";
 
 type Load = { status: "loading" } | { status: "error" } | { status: "ready"; snapshot: GroundingSnapshot; now: Date };
@@ -76,6 +77,7 @@ export function Home({ profile, onEdit }: { profile: HouseholdProfile; onEdit: (
         <div className="mt-5 space-y-5">
           <MeasuredPanel snapshot={load.snapshot} now={load.now} />
           <WindowPanel forecast={load.snapshot.forecast} now={load.now} departureHour={profile.commute.mode === "none" ? undefined : profile.commute.departureHour} />
+          <PlanPanel profile={profile} />
         </div>
       )}
 

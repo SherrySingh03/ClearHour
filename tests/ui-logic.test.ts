@@ -72,6 +72,16 @@ describe.each(LOCALES)("window sentences (%s)", (locale) => {
   });
 });
 
+describe("time formatting", () => {
+  it("Hindi uses day-period words (सुबह/दोपहर/शाम) on a 12-hour clock; English keeps am/pm", () => {
+    const hi = getFormatters("hi");
+    expect(hi.timeRange("2026-11-25T00:00:00.000Z", "2026-11-25T03:00:00.000Z")).toBe("सुबह 5:30–8:30");
+    expect(hi.time("2026-11-25T08:00:00.000Z")).toBe("दोपहर 1:30");
+    expect(hi.time("2026-11-25T11:00:00.000Z")).toBe("शाम 4:30");
+    expect(getFormatters("en").time("2026-11-25T01:00:00.000Z")).toBe("6:30 am");
+  });
+});
+
 describe("relative age", () => {
   const t = getUiStrings("en");
   const now = new Date("2026-11-25T08:00:00Z");

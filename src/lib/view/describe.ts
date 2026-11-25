@@ -68,6 +68,15 @@ export function describeWindow(r: WindowResult, t: UiStrings, f: Formatters): Wi
   }
 }
 
+/** Missing-data code (from the plan's acknowledged gaps) → message, translated at render. */
+export function describeGap(code: string, t: UiStrings): string | null {
+  const [scope, reason] = code.split(":") as [string, string];
+  if (scope === "measured" && reason in t.measured.reasons) return t.measured.reasons[reason as keyof UiStrings["measured"]["reasons"]];
+  if (scope === "aqi" && reason in t.measured.naqiReasons) return t.measured.naqiReasons[reason as keyof UiStrings["measured"]["naqiReasons"]];
+  if (scope === "forecast" && reason in t.forecastReasons) return t.forecastReasons[reason as keyof UiStrings["forecastReasons"]];
+  return null;
+}
+
 /** Today's forecast points (IST calendar day). */
 export function todaysPoints(series: ForecastSeries, now: Date): ForecastPoint[] {
   const today = istDayKey(now.getTime());

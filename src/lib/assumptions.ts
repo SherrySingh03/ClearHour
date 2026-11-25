@@ -32,7 +32,9 @@ export type AssumptionId =
   | "window-outdoor-hours"
   | "window-indicative-category"
   | "window-materially-cleaner"
-  | "window-routine-stretch";
+  | "window-routine-stretch"
+  | "plan-time-bucket"
+  | "plan-health-vocabulary";
 
 export const ASSUMPTIONS: Readonly<Record<AssumptionId, Assumption>> = {
   "station-radius": {
@@ -146,6 +148,18 @@ export const ASSUMPTIONS: Readonly<Record<AssumptionId, Assumption>> = {
     rationale:
       "Product rule set by the project owner. The OR keeps large drops visible during all-day Severe smog, when categories don't change. The absolute + relative pair handles both ends of the scale. If nothing clears the bar, no winner is named.",
     usedIn: ["src/lib/plan/window.ts"],
+  },
+  "plan-time-bucket": {
+    id: "plan-time-bucket",
+    value: "15 minutes",
+    rationale: "Plans are cached per (city, language, profile, 15-minute bucket). The best window depends on the time of day, so a plan is never reused across buckets; inside one it is identical, which bounds Gemini calls.",
+    usedIn: ["src/lib/plan/request.ts", "src/lib/plan/server.ts"],
+  },
+  "plan-health-vocabulary": {
+    id: "plan-health-vocabulary",
+    value: "Broad English + Hindi health/medical/safety/exposure word list",
+    rationale: "Any match rejects the whole plan. Deliberately over-inclusive: a false positive costs a retry, a false negative would put an unsourced health claim on screen. The CPCB statement is shown by the UI, never by the plan.",
+    usedIn: ["src/lib/plan/validate.ts"],
   },
   "window-routine-stretch": {
     id: "window-routine-stretch",
