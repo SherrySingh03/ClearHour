@@ -162,6 +162,7 @@ export const hi: UiStrings = {
     },
     kgPerDay: ({ kg }) => `हर कामकाजी दिन ${kg} किलो कम CO₂`,
     percentLess: ({ pct }) => `उतनी ही आँच के लिए ${pct}% कम CO₂`,
+    ifAvailable: "अगर यह आपके इलाके या रास्ते पर उपलब्ध हो।",
   },
   plan: {
     title: "आज की योजना",

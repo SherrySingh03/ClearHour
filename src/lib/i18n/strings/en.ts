@@ -112,6 +112,7 @@ export interface UiStrings {
     readonly targets: Readonly<Record<"bus" | "suburban-rail" | "metro" | "walk-cycle" | "png" | "lpg", string>>;
     readonly kgPerDay: Fn<{ kg: string }>;
     readonly percentLess: Fn<{ pct: string }>;
+    readonly ifAvailable: string;
   };
   readonly plan: {
     readonly title: string;
@@ -287,6 +288,7 @@ export const en: UiStrings = {
     },
     kgPerDay: ({ kg }) => `${kg} kg less CO₂ per working day`,
     percentLess: ({ pct }) => `${pct}% less CO₂ for the same heat`,
+    ifAvailable: "If it's available where you live or on your route.",
   },
   plan: {
     title: "Today's plan",

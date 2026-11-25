@@ -79,6 +79,7 @@ export function PlanPanel({ profile }: { profile: HouseholdProfile }) {
                     <div className="mt-1 text-sm text-muted">
                       <p className="font-medium text-ink">{ref.action}</p>
                       <p>{ref.saving}</p>
+                      {ref.onlyIfAvailable && <p className="italic">{t.swaps.ifAvailable}</p>}
                       {ref.factors
                         .filter((x) => x.citation !== null)
                         .map((x) => (

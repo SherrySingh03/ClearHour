@@ -113,6 +113,7 @@ export function buildPlanInput({ snapshot, profile, locale, now }: PlanInput) {
       kind: "swap",
       action: t.swaps.targets[swapTarget(s.id)],
       saving: describeSaving(s, t, f),
+      onlyIfAvailable: s.conditional,
       factors: [s.saving.from, s.saving.to].map((term) => ({
         factorId: term.factorId,
         value: term.value,
