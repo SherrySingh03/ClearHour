@@ -1,25 +1,161 @@
 # Clearhour
 
-A GenAI air-quality assistant for Indian households during winter smog. It shows the measured air now (with station and timestamp), today's forecast curve with the cleanest outdoor stretch, indoor measures that help, and lower-emission swaps for the household's routine. Every claim carries its source.
+A GenAI air-quality assistant for Indian households during winter smog.
 
-> **Status:** grounding layer, sourced data, best-window logic, English/Hindi UI, onboarding, the main screen, the Indoor and Swaps sections and Gemini synthesis are built and tested. Plain-language answers lead; numbers, sources and workings sit beneath them or one tap away. Deployment comes next.
+**Live:** https://clear-hour.vercel.app
 
-## Languages
+It shows the latest reading from a government air monitor (with the monitor's name and the reading's time), a forecast for today with the cleanest outdoor stretch, indoor advice quoted from official sources, lower-CO₂ swaps for the household's routine, and a short plan written by Google Gemini. English and Hindi. No account: the answers stay on the device.
 
-All UI text comes from `getUiStrings(locale)` (`src/lib/i18n`). JSX contains no string literals: ESLint's `react/jsx-no-literals` checks JSX text and `npm run check:literals` checks user-facing attributes. Missing-data reasons stay as codes in the data layer and are translated only at render. To add a language: add its code to `LOCALES`, add `strings/<code>.ts` typed as `UiStrings`, register it in `BUNDLES`, then add the key to the `Record<Locale, string>` data (city names, guidance). The compiler lists anything missing.
+**Contents:** [Grounding contract](#grounding-contract) · [GenAI architecture](#genai-architecture) · [Sample inputs](#sample-inputs) · [Abuse protection](#abuse-protection) · [Sources](#sources) · [Assumptions](#assumptions) · [Known limitations](#known-limitations) · [Running](#running)
 
 ## Grounding contract
 
-Nothing that can be measured or computed is generated.
+**Nothing that can be measured or computed is generated.** In plain terms:
+
+- A **reading** comes from a real monitor. It is shown with the monitor's name, its distance from the city centre and the time it was taken.
+- A **forecast** is a computer model's prediction. It is always labelled, drawn differently (solid boxes are readings, hazy boxes are predictions), and never presented as a reading.
+- The two are **never blended** into one number, and neither fills in for the other. If there is no reading, the page says so and shows the forecast alone.
+- **Calculations** (the air level, CO₂ savings) are ordinary code using published formulas and factors, shown with their inputs.
+- **Advice** is quoted from a published source with its page.
+- **Gemini** only chooses, orders and explains items that already exist. It produces no numbers of its own.
+
+### The AQI shown is not CPCB's official AQI
+
+Clearhour shows the CPCB **sub-index for PM2.5 only**, from one monitor, over the last 24 hours (CPCB's 16-hour minimum applies). CPCB's official AQI needs at least three pollutants, one of them PM10 or PM2.5, and takes the **worst** sub-index among them (CPCB *National Air Quality Index* report; AQI-Calculator.xls). **The official figure can therefore be higher**, and advice that triggers on "Poor or worse" can be left out on a day when the official AQI is Poor because of another pollutant. The app says both on screen.
 
 | Kind | Source | How it is kept honest |
 |---|---|---|
-| **Measured** | CPCB CAAQMS ground stations via OpenAQ v3 (provider id 168) | `MeasuredValue` type carries station, sensor and observation timestamp. Never a model's guess. |
+| **Measured** | CPCB CAAQMS ground stations via OpenAQ v3 (provider id 168) | `MeasuredValue` type carries station, sensor and observation timestamp. |
 | **Forecast** | Open-Meteo Air Quality, CAMS global model | `ForecastPoint`/`ForecastSeries` types, branded so the compiler rejects them where a measurement is expected. Provenance records the 0.4° grid, 3-hour native step and that hourly values are interpolated. |
 | **Computed** | CPCB NAQI formulas; published emission factors | Arithmetic on measured data or verified factors only, with the inputs attached. |
 | **Sourced guidance** | MoHFW (2025), CPCB (2014), WHO (2025), US EPA (2018) | Every item quotes its source with a page locator. |
 
-Missing data is reported as missing (`{ ok: false, reason }`). Measured and forecast are never blended into one number, and neither fills in for the other.
+## GenAI architecture
+
+### Model
+
+Google **Gemini `gemini-3.8-flash`** (listed as Stable on Google's models page, checked 2026-11-25) through the official `@google/genai` SDK, with `gemini-3.6-flash` (also Stable) as the fallback. `GEMINI_MODEL` overrides the primary. Settings: temperature 0.2, low thinking, JSON-schema-constrained output (`src/lib/plan/gemini.ts`).
+
+### Where it sits
+
+Everything the plan can talk about is computed **before** Gemini is called.
+
+```
+Browser: profile kept on the device
+  │  POST /api/plan { cityId, locale, profile }
+  ▼
+Vercel Firewall        per-visitor rate limit
+  ▼
+Route                  validates the request (400), caps concurrent generations (502)
+  ▼
+Grounding (no AI)      OpenAQ reading + CPCB sub-index · Open-Meteo forecast
+  ▼
+Computation (no AI)    best outdoor stretch · guidance selection · CO₂ swaps
+  ▼
+Packet builder         the only data Gemini sees, plus the list of what it may say
+  ▼
+GEMINI                 chooses 1–5 items, orders them, writes short notes
+  ▼
+Validator (no AI)      accepts the whole plan or rejects the whole plan
+  ▼
+UI                     Gemini's notes beside the grounded text, amounts and sources,
+                       which come from the app's own data, never from Gemini
+```
+
+Key files: `src/app/api/plan/route.ts` → `src/lib/plan/server.ts` → `packet.ts` → `prompt.ts` + `gemini.ts` → `validate.ts` + `lexicon.ts`. The model call is server-only (`server-only` import); the key never reaches the browser. The rest of the page (reading, forecast, advice, swaps) works without Gemini.
+
+### What Gemini receives
+
+A JSON packet plus the system instruction in `prompt.ts`:
+
+| Field | Contents |
+|---|---|
+| `language`, `city` | Output language and city name |
+| `measured` | Station name and distance; latest single-hour PM2.5 with its time and age; the 24-hour PM2.5 AQI and its category. Or a gap code. Key names state the timeframe. |
+| `forecast` | The already-computed verdict as sentences (clock times, category words) and the 3-hour caveat. Or a gap code. |
+| `household` | Commute mode, distance, usual departure, cooking fuel, children/older people, purifier |
+| `guidance` | Selected advice items: id, plain-language text, why it applies |
+| `swaps` | Swap id, action, "lowers CO₂", whether it may be unavailable |
+| `gaps` | Codes for any missing data |
+
+It does **not** receive: hourly forecast values, forecast differences, CO₂ savings, emission factors, health statements or health thresholds.
+
+### What Gemini returns
+
+Structured JSON only: a headline, 1–5 steps (each pointing at an id from the packet, with a short note) and the list of acknowledged data gaps. Ids are constrained by the response schema and checked again.
+
+### What it is not permitted to produce, and how that is enforced
+
+| Not permitted | Enforcement in `validate.ts` |
+|---|---|
+| **Pollution numbers** | Hourly forecast values are never sent. Every numeral in the plan must appear in the packet; a number written with µg/m³ must have appeared with µg/m³ (only the latest reading does). A sentence quoting the AQI must say it covers 24 hours and must not say "now"; the latest reading may not be called current or a forecast. Spelled-out quantities and unusual numerals are rejected. |
+| **Emission factors and savings** | Never sent. Any number with kg or % fails, because the packet contains none. Only the app states savings, with their conditions. |
+| **Health thresholds and health claims** | No thresholds or CPCB health statements are sent. A per-language word list (health, medical, safety, exposure, risk, caution and more; `lexicon.ts`) rejects any match. CPCB's statement is shown verbatim by the app. |
+| Invented items | Step ids must come from the packet, without repeats; no "window" step without a forecast. |
+| Hiding missing data | The plan must list exactly the packet's gap codes. |
+| Links, wrong language, oversize text | Rejected. |
+
+**Limits of this check.** It is a rule-based filter, not a proof of meaning:
+
+- A **bare number that happens to occur elsewhere in the packet** (for example the "30" in a clock time such as 8:30) passes if written without a unit and without any listed word. `"Keep fine dust under 30 today."` is accepted by the current validator.
+- A qualitatively false sentence with no number (for example, reversing which option emits less) is not detected.
+- A health claim phrased entirely without listed words would pass.
+
+In each case the grounded text, amounts and sources the app prints beside the note are unaffected.
+
+### On failure
+
+**Fail closed.** If the model errors or times out, returns invalid JSON, or breaks any rule, the **whole** plan is discarded. The route answers `502 {"error":"plan-unavailable"}` and the page shows one generic message with a **Try again** button; everything else stays usable. A partial or unvalidated plan is never rendered, failures are not cached, and upstream error text is never returned (the server logs a reason code).
+
+One 50-second budget covers the primary model and the fallback. The fallback runs only on a server error or timeout, never on a quota error (429). Successful plans are cached per (city, language, profile, 15-minute slot).
+
+## Sample inputs
+
+Run these in a private window at https://clear-hour.vercel.app. The page asks five questions; **Change answers** restarts them. Readings and forecasts are live, so air levels and times differ by day; the CO₂ figures and the behaviours listed do not.
+
+| | A. Station-backed city | B. Withheld figures, Hindi | C. No departure time |
+|---|---|---|---|
+| Language | English | हिन्दी | English |
+| City | Delhi | Lucknow | Kolkata |
+| Commute | Car (petrol), 12 km | Auto-rickshaw, 2 km | Scooter or motorbike, 8 km |
+| Leaves at | 9:00 am | 8:00 am | **It varies** |
+| Cooks on | LPG cylinder | Wood, dung or crop waste | Piped gas (PNG) |
+| Children/older people | Yes | Yes | No |
+| Purifier | No | Yes | No |
+
+**A. What it shows**
+- A measured reading with station, distance and time, kept apart from the forecast.
+- The forecast compared with the hours around 9 am: either a named cleaner stretch or a plain "no other time looks clearly cleaner".
+- Savings: bus **at least 2.3 kg** and local train **at least 2.4 kg** CO₂ per working day, each "if you travel alone and your car isn't a hybrid". Piped gas **about 11%** less, with the stove assumption. Metro is listed **without a number**.
+- Advice: on a Poor-or-worse day, includes keeping windows shut, children and older people limiting time outdoors, and how to choose a purifier. On a better day those are left out, and the page says so.
+
+**B. What it shows**
+- The whole interface and the plan in Hindi.
+- **No CO₂ number at all**: auto-rickshaw swaps are withheld (the source is per vehicle, not per passenger) and so is wood-to-LPG (biomass CO₂ is not comparable). Each says why.
+- Fuel-specific advice (clean cooking; on poor days, smoky cooking and running the purifier).
+
+**C. What it shows**
+- With no departure time, there is no commute comparison: the page names the cleanest stretch against a typical one, or says no part of the day is clearly cleaner.
+- Savings: bus **at least 0.26 kg**, local train **at least 0.38 kg**; no cooking swap for PNG.
+
+**D. Forecast only (no monitor nearby).** On 2026-11-26 every city in the picker had a monitor within 25 km, so this state is reachable through the API with coordinates, here Leh:
+
+```
+https://clear-hour.vercel.app/api/grounding?lat=34.15&lon=77.58
+```
+
+Expected: `"coverage":{"status":"no-station",…}`, `"measured":{"ok":false,"reason":"no-station-in-radius"}` and a populated `"forecast"`. No measured value is substituted.
+
+**E. Monitor without fine dust (live-dependent).** On 2026-11-26 the monitor chosen for **Bengaluru** reported PM10 but not PM2.5. The page then says there is no 24-hour air level and why, instead of borrowing a number.
+
+Time of day matters. Once the usual departure hours have passed (A and B, late morning onward), the page says so and picks from the rest of the day. Stretches are only offered between 5 am and 10 pm, so from about 7 pm the forecast box says too little of today is left.
+
+## Abuse protection
+
+- **Vercel Firewall rate limit** (live since 2026-11-26): 20 requests per 60 seconds per IP across `/api/*`, then `429`. The project's plan allows one rate-limit rule, so one limit covers the Gemini route and the grounding route. This is configured in Vercel, not in this repository: `vercel firewall rules list` shows it.
+- **Route:** `/api/plan` is POST and JSON only, body at most 2 KB, known city, language and profile values; generic 400 otherwise. Profiles are canonicalised (distance to 0.5 km), which bounds the number of distinct cached plans.
+- **Cost bounds:** at most 4 plan generations at once per server instance; plans cached per 15-minute slot; responses sent `private, no-store`.
+- **Keys** (`OPENAQ_API_KEY`, `GEMINI_API_KEY`) are server-side only.
 
 ## Sources
 
@@ -78,32 +214,30 @@ These are **Clearhour's own judgment calls, not published standards**. The sourc
 | `plan-timeframe-binding` | Each measured number must be quoted with its timeframe, per sentence | The 24-hour AQI needs "24 hours" and no "now"; the latest reading is never "now" or a forecast. Savings and forecast differences are never sent to Gemini, so it can't quote or reverse them; only the UI states them. |
 | `plan-health-vocabulary` | One concept table (health, medical, safety, exposure, risk, caution) with words for every UI language | Any match rejects the whole plan. A new language fails to compile, and fails tests, until every concept has words for it. |
 
+## Languages
+
+All UI text comes from `getUiStrings(locale)` (`src/lib/i18n`). JSX contains no string literals: ESLint's `react/jsx-no-literals` checks JSX text and `npm run check:literals` checks user-facing attributes. Missing-data reasons stay as codes in the data layer and are translated only at render. Hindi advice and CPCB statements are Clearhour's translations of the English sources, and are marked as such on screen. To add a language: add its code to `LOCALES`, add `strings/<code>.ts` typed as `UiStrings`, register it in `BUNDLES`, add the key to the `Record<Locale, …>` data (city names, guidance, validator word lists) and an example sentence per concept in `tests/lexicon.test.ts`. The compiler lists anything missing.
+
+## Known limitations
+
+- **OpenAQ rate limit.** All visitors share one API key. Many *different* cities requested within a minute can exhaust it, and the later ones show "monitor readings couldn't be reached" for a short while (seen on 2026-11-26 when requesting all 26 cities back to back). Cached results and the forecast are unaffected.
+- **Gemini availability and quota.** On a free-tier key, 503 "high demand", timeouts and 429 quota errors occur; the page then shows the retry message.
+- **Reading lag.** CPCB readings usually reach OpenAQ a few hours late; the reading's time is shown.
+- **One monitor stands for a city**, chosen nearest the city centre among those with a fresh reading. It may not measure PM2.5.
+- **Reading age uses the device clock**; a wrong clock gives a wrong "hours ago".
+- The validator limits listed under [GenAI architecture](#genai-architecture).
+
 ## Running
 
 ```bash
 npm install
-cp .env.example .env.local        # add OPENAQ_API_KEY (free, explore.openaq.org)
+cp .env.example .env.local        # OPENAQ_API_KEY (free, explore.openaq.org) and GEMINI_API_KEY
 npm test                          # unit tests, no network
-npm run typecheck
+npm run typecheck && npm run lint && npm run check:literals
+npm run dev                       # http://localhost:3000
 npm run probe -- delhi lucknow    # live grounding snapshot per city
 npm run window -- delhi 9         # live best-window verdict (city, departure hour)
-npm run dev                       # GET /api/grounding?city=delhi
+npm run plan-probe -- delhi       # live Gemini plan through the validator, en and hi
 ```
 
-Without `OPENAQ_API_KEY` the measured side fails closed and only the labelled forecast is returned.
-
-## GenAI architecture
-
-| | |
-|---|---|
-| **Model** | Google Gemini, `gemini-3.8-flash` (listed as Stable on Google's models page, checked 2026-11-25), via the official `@google/genai` SDK. Override with `GEMINI_MODEL`. |
-| **Where it sits** | Server only (`src/lib/plan/gemini.ts`, imported behind `server-only`). Called from `POST /api/plan` after the grounding snapshot is built. The key never reaches the browser. |
-| **Its one job** | Synthesis and explanation: choose which already-grounded items matter today for this household, order them, and explain them in plain English or Hindi. |
-| **What it receives** | A packet (`src/lib/plan/packet.ts`): the measured reading or its gap code, the forecast's best-window verdict (already computed), the household profile, the selected sourced guidance and the names of the computed swaps. Every number in it is a display string the page itself shows. It does **not** receive CPCB health statements, saving amounts or forecast differences. |
-| **Models and fallback** | Primary `gemini-3.8-flash`. If it errors server-side (5xx, including 503 overload) or times out, `gemini-3.6-flash`, also listed as Stable, within one shared 50 s budget. No fallback on quota errors (429). Both go through the same validator. A live run on 2026-11-25 passed 6/6 plans (3 cities × English/Hindi): `npm run plan-probe -- delhi lucknow thiruvananthapuram`. The validator has been tightened since. On 2026-11-26 the one English plan Gemini returned passed; the other attempts failed upstream (503, timeouts, then quota 429), so Hindi is not yet re-verified live. |
-| **What it returns** | Structured JSON only (`responseJsonSchema`): a headline, 1–5 steps that each reference an input id (`window`, a guidance id or a swap id) with a short note, and the list of acknowledged data gaps. |
-| **What it may never produce** | A pollution number, an emission factor, a health threshold, a health or medical claim, a safety or exposure claim, or any number not already in its input. |
-| **How that is enforced** | `src/lib/plan/validate.ts` checks every plan before it is shown: schema and lengths, ids exist and aren't repeated, no window step without a forecast, exactly the input's gaps acknowledged, no links, no health vocabulary (English and Hindi), no spelled-out quantities, every numeral present in the input (with its own unit), every measured or predicted number quoted with its timeframe (the 24-hour AQI as 24-hour and never "now"; a forecast as a forecast), right language. **Any failure rejects the whole plan.** |
-| **Failure mode** | Fail closed. The route returns a generic `502 {"error":"plan-unavailable"}` and the UI shows one retry message. A partial or unvalidated plan is never rendered, and upstream errors are never echoed (only a reason code is logged on the server). |
-| **Missing data** | Gaps travel as codes (e.g. `measured:no-station-in-radius`). The plan must list exactly those codes, and the UI translates them. It cannot fill a gap: there is no number it could use. |
-| **Route hygiene** | POST only; JSON only; body ≤ 2 KB; known city, language and profile values; profile city must match. Generic 400 otherwise. Profiles are canonicalised (distance to 0.5 km, no distance or time without a commute) so the number of distinct plans is bounded. Responses are cached server-side per (city, language, profile, 15-minute bucket) and sent `private, no-store`. **Pending at deploy:** a per-visitor rate limit on `/api/plan` and `/api/grounding` in the Vercel Firewall. |
+Without `OPENAQ_API_KEY` the measured side fails closed and only the labelled forecast is shown. Without `GEMINI_API_KEY` only the plan is unavailable. Deployed on Vercel from `main`.
