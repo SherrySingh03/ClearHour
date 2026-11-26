@@ -12,7 +12,7 @@ export type PlanUnavailableReason = PlanFailure | "no-key" | "unknown-city";
 
 const REASONS: ReadonlySet<string> = new Set<PlanUnavailableReason>([
   "schema", "unknown-ref", "duplicate-ref", "window-unavailable", "gaps-mismatch", "link", "health-claim",
-  "number-word", "unknown-number", "wrong-language", "model-error", "invalid-json", "no-key", "unknown-city",
+  "number-word", "unknown-number", "number-role", "wrong-language", "model-error", "invalid-json", "no-key", "unknown-city",
 ]);
 
 export class PlanUnavailable extends Error {
