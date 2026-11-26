@@ -8,7 +8,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { planHour } from "@/lib/plan/clock";
+import { planDay } from "@/lib/plan/clock";
 import { parsePlanRequest } from "@/lib/plan/request";
 import { planLimiter } from "@/lib/plan/limiter";
 import { getPlan } from "@/lib/plan/server";
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const plan = await getPlan(parsed.cityId, parsed.locale, parsed.profile, planHour(new Date()));
+    const plan = await getPlan(parsed.cityId, parsed.locale, parsed.profile, planDay(new Date()));
     // The plan is derived from a private household profile: never cache it in shared caches.
     return NextResponse.json(plan, { headers: { "cache-control": "private, no-store" } });
   } catch {

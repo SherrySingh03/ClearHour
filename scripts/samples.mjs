@@ -4,6 +4,9 @@
  * already in the app's canonical form (otherwise they would warm a different
  * cache entry from the one an evaluator hits).
  */
+/** Must match PLAN_TTL_SECONDS in src/lib/plan/clock.ts (a test checks it). */
+export const PLAN_TTL_HOURS = 3;
+
 export const SAMPLES = [
   {
     id: "A",

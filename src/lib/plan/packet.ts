@@ -15,10 +15,10 @@ import type { GroundingSnapshot } from "../grounding/types";
 import type { HouseholdProfile } from "../profile/types";
 import { categorySignal, selectGuidance } from "../sourced/guidance";
 import { swapsFor } from "../sourced/swaps";
-import { bestWindow } from "./window";
+import { bestWindow, dayOutlook } from "./window";
 import { describeSaving, describeWindow, swapTarget } from "../view/describe";
 import { numberTokens } from "./numbers";
-import type { GapCode, NumberBinding, PlanAllowance, RefDetail } from "./types";
+import type { GapCode, NumberBinding, OutlookLine, PlanAllowance, RefDetail } from "./types";
 
 export interface PlanInput {
   readonly snapshot: GroundingSnapshot;
@@ -53,7 +53,7 @@ export function buildPlanInput({ snapshot, profile, locale, now }: PlanInput) {
       latestSingleHourReading: pm25
         ? {
             pm25: `${f.number(pm25.value)} ${t.common.unitUgm3}`,
-            // The time, not the age: a plan is reused for an hour and an age would go stale.
+            // The time, not the age: a plan is reused for a few hours and an age would go stale.
             readingTime: f.time(pm25.provenance.observedAt.utc),
           }
         : null,
@@ -66,6 +66,7 @@ export function buildPlanInput({ snapshot, profile, locale, now }: PlanInput) {
   // Forecast and best window
   let forecast: Record<string, unknown>;
   let windowAvailable = false;
+  let outlook: OutlookLine[] = [];
   if (!snapshot.forecast.ok) {
     gaps.push(`forecast:${snapshot.forecast.reason}`);
     forecast = { available: false, gap: `forecast:${snapshot.forecast.reason}` };
@@ -74,7 +75,8 @@ export function buildPlanInput({ snapshot, profile, locale, now }: PlanInput) {
     const result = bestWindow({ forecast: snapshot.forecast.data, now, ...(departureHour === undefined ? {} : { departureHour }) });
     const view = describeWindow(result, t, f);
     windowAvailable = view.showCaveat;
-    forecast = { available: true, isModelPrediction: true, verdict: result.verdict, statement: view.headline, details: view.details, caveat: windowAvailable ? t.window.caveat : null };
+    outlook = dayOutlook(snapshot.forecast.data, now).map((o) => ({ part: t.window.dayParts[o.part], category: t.categories[o.indicativeCategory] }));
+    forecast = { available: true, isModelPrediction: true, verdict: result.verdict, statement: view.headline, details: view.details, outlookByPartOfDay: outlook, caveat: windowAvailable ? t.window.caveat : null };
   }
 
   // Household
@@ -156,5 +158,5 @@ export function buildPlanInput({ snapshot, profile, locale, now }: PlanInput) {
     windowAvailable,
     gaps,
   };
-  return { packet, allowance, refs };
+  return { packet, allowance, refs, outlook };
 }

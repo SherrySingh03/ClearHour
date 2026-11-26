@@ -1,3 +1,4 @@
+export declare const PLAN_TTL_HOURS: number;
 export declare const SAMPLES: readonly {
   readonly id: string;
   readonly label: string;

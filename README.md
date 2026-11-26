@@ -50,11 +50,11 @@ All four are listed as Stable on Google's models page. `GEMINI_MODEL`, if set, i
 The project runs on Gemini's **free tier** (no billing). Quota is counted per model and per project, and resets at midnight Pacific time (1:30 pm IST). The design spends a request only when someone wants a plan:
 
 - **Explicit.** Opening, reloading or switching language spends nothing. The reading, forecast, best-time box, indoor advice and CO₂ swaps never use Gemini. A plan is generated only on **Get today's plan**.
-- **Hourly shared cache.** One plan per (city, language, answers, Indian clock hour), stored with Next.js `use cache: remote` so it is shared across server instances. Asking again for the same inputs in that hour costs nothing. The latest reading is not part of the key, so a new reading does not bust it; the plan says when it was written and from which reading. The forecast box is evaluated for the same clock hour, so the two agree.
+- **Three-hour shared cache.** One plan per (city, language, answers, Indian day), reused for three hours and stored with Next.js `use cache: remote` so it is shared across server instances. Asking again for the same inputs in that time costs nothing. The latest reading is not part of the key, so a new reading does not bust it. The plan card states when it was generated, how long ago, and from which reading; the readings and forecast box on the page stay live and can differ.
 - **Fallback chain.** On a used-up quota, overload, timeout, retired model, or an answer that is empty or not valid JSON, the next model is tried, within one 50 s budget (at most 20 s each). A rejected request or key stops the chain. A readable plan that the validator rejects is **not** retried.
-- **Pre-warming.** `npm run prewarm` requests real plans for sample inputs A, B and C below. They stay cached until the end of that clock hour, and a deployment empties the cache, so it is run after deploying, early in the hour of testing.
+- **Pre-warming.** `npm run prewarm` requests real plans for sample inputs A, B and C below and prints how long they stay warm (three hours from generation, never past midnight IST; the host can evict early). A deployment empties the cache, so it is run after deploying, shortly before testing.
 
-What still costs a request: a different city, language, set of answers or hour; a plan the validator rejects (it is discarded and not cached); retrying after a failure; two identical requests arriving at the same instant; and the first request after each deployment (the cache does not carry over).
+What still costs a request: a different city, language, set of answers, or a plan older than three hours; a plan the validator rejects (it is discarded and not cached); retrying after a failure; two identical requests arriving at the same instant; and the first request after each deployment (the cache does not carry over).
 
 ### Where it sits
 
@@ -68,7 +68,7 @@ Vercel Firewall        per-visitor rate limit
   ▼
 Route                  validates the request (400), caps concurrent generations (502)
   ▼
-Cache                  same city, language, answers and hour: stored plan returned
+Cache                  same city, language and answers within 3 hours: stored plan returned
   ▼
 Grounding (no AI)      OpenAQ reading + CPCB sub-index · Open-Meteo forecast
   ▼
@@ -80,11 +80,15 @@ GEMINI                 chooses 1–5 items, orders them, writes short notes
   ▼
 Validator (no AI)      accepts the whole plan or rejects the whole plan
   ▼
-UI                     Gemini's notes beside the grounded text, amounts and sources,
-                       which come from the app's own data, never from Gemini
+UI                     Gemini's notes with source links, amounts and the forecast
+                       outlook, which come from the app's own data, never from Gemini
 ```
 
 Key files: `src/app/api/plan/route.ts` → `src/lib/plan/server.ts` → `packet.ts` → `prompt.ts` + `gemini.ts` → `model-chain.ts` → `validate.ts` + `lexicon.ts`. The model call is server-only (`server-only` import); the key never reaches the browser. The rest of the page (reading, forecast, advice, swaps) works without Gemini.
+
+### What Gemini does
+
+**Synthesis**: it connects the household's answers, today's measured category, the forecast outlook and best stretch, and the cited advice into a short plan ("who, what, when"). The prompt allows reasons only from those facts, forbids causes or benefits the cited text doesn't state, and requires each item's conditions, hedges and hours to be kept. It is also told not to write readings (the page shows them above the plan, which may be read hours later); the validator still checks any number it writes.
 
 ### What Gemini receives
 
@@ -94,7 +98,7 @@ A JSON packet plus the system instruction in `prompt.ts`:
 |---|---|
 | `language`, `city` | Output language and city name |
 | `measured` | Station name and distance; latest single-hour PM2.5 with its time; the 24-hour PM2.5 AQI and its category. Or a gap code. Key names state the timeframe. |
-| `forecast` | The already-computed verdict as sentences (clock times, category words) and the 3-hour caveat. Or a gap code. |
+| `forecast` | The already-computed verdict as sentences (clock times, category words), a rough outlook for morning, afternoon and evening as category words, and the 3-hour caveat. Or a gap code. |
 | `household` | Commute mode, distance, usual departure, cooking fuel, children/older people, purifier |
 | `guidance` | Selected advice items: id, plain-language text, why it applies |
 | `swaps` | Swap id, action, "lowers CO₂", whether it may be unavailable |
@@ -123,7 +127,7 @@ Structured JSON only: a headline, 1–5 steps (each pointing at an id from the p
 - A qualitatively false sentence with no number (for example, reversing which option emits less) is not detected.
 - A health claim phrased entirely without listed words would pass.
 
-In each case the grounded text, amounts and sources the app prints beside the note are unaffected.
+In each case the amounts and source links the app prints, and the quoted advice in **Inside your home**, are unaffected.
 
 ### On failure
 
@@ -133,7 +137,7 @@ The server logs codes only: one `[plan:model]` line per model attempt (`ok`, `mo
 
 ## Sample inputs
 
-Run these in a private window at https://clear-hour.vercel.app. The page asks five questions; **Change answers** restarts them. Press **Get today's plan** for the Gemini plan; identical inputs within the hour share one. Readings and forecasts are live, so air levels and times differ by day; the CO₂ figures and the behaviours listed do not.
+Run these in a private window at https://clear-hour.vercel.app. The page asks five questions; **Change answers** restarts them. Press **Get today's plan** for the Gemini plan; identical inputs share one plan for three hours. Readings and forecasts are live, so air levels and times differ by day; the CO₂ figures and the behaviours listed do not.
 
 | | A. Station-backed city | B. Withheld figures, Hindi | C. No departure time |
 |---|---|---|---|
@@ -233,7 +237,8 @@ These are **Clearhour's own judgment calls, not published standards**. The sourc
 | `plan-concurrency` | 4 plan generations at once per server instance | Bounds Gemini spend; when full, an immediate generic 502 and a retry button. |
 | `plan-model-budget` | 50 s total; ≤ 20 s per model; no new attempt with < 8 s left | One shared deadline for the whole chain. |
 | `plan-model-chain` | 3.5-flash-lite → 3.1-flash-lite → 3.8-flash → 3.6-flash | Quota is per model. Next model on quota, overload, timeout, retired model or non-JSON answer; never after a validator rejection. Order from live runs; Lite daily limits unconfirmed. |
-| `plan-hour` | One plan per city, language, answers and clock hour | Repeat requests share one model call. The forecast box is evaluated for the same hour, so it matches the plan. |
+| `plan-lifetime` | One plan per city, language, answers and day, for 3 hours | Repeat requests share one model call; the plan's age is shown. Set by the project owner. |
+| `forecast-day-parts` | Morning 05–12, afternoon 12–17, evening 17–22 | Computed forecast words the plan may use; indicative categories, shown on the plan card. |
 | `saving-lower-bound` | "At least", rounded down to 2 significant figures, with conditions | A floor only if the commuter travels alone (and a petrol car isn't a hybrid). Rounding to nearest could overstate it. |
 | `plan-timeframe-binding` | Each number keeps its kind; measured numbers are quoted with their timeframe, per sentence | The 24-hour AQI needs "24 hours" and no "now"; the latest reading is never "now" or a forecast. Savings and forecast differences are never sent to Gemini, so it can't quote or reverse them; only the UI states them. |
 | `plan-health-vocabulary` | One concept table (health, medical, safety, exposure, risk, caution) with words for every UI language | Any match rejects the whole plan. A new language fails to compile, and fails tests, until every concept has words for it. |
@@ -244,13 +249,14 @@ All UI text comes from `getUiStrings(locale)` (`src/lib/i18n`). JSX contains no 
 
 ## Known limitations
 
-- **What is and isn't machine-checked in a plan.** Numeric claims are structurally validated and bound to their source role: each number must appear in the input as the same kind of thing, and measured values must be quoted with their timeframe. **Qualitative phrasing is constrained by the prompt and shown beside the cited text, but is not machine-checked.** A note can misstate a reason without using any number (seen on 2026-11-26: a note said to wet-mop "to keep dust from settling", which no source says). The cited guidance, amounts and sources printed beside each note come from the app's own data.
+- **What is and isn't machine-checked in a plan.** Numeric claims are structurally validated and bound to their source role: each number must appear in the input as the same kind of thing, and measured values must be quoted with their timeframe. **Qualitative phrasing is constrained by the prompt and linked to its source, but is not machine-checked.** A note can misstate a reason, weaken a condition or misdescribe a part of the day without using any number (seen on 2026-11-26: a note said to wet-mop "to keep dust from settling", which no source says). The exact cited wording is in **Inside your home**; amounts, sources and the forecast outlook come from the app's own data.
 - **Gemini free-tier quota.** The daily allowance is small (20 requests for each Flash model; the Flash-Lite limits are unconfirmed). When it is used up, or models are overloaded, the plan is unavailable until later; everything else on the page works.
 - **Shared OpenAQ limit.** All visitors share one API key. Many *different* cities requested within a minute can exhaust it, and the later ones say monitor readings couldn't be reached for a short while (seen on 2026-11-26 requesting all 26 cities back to back). The grounding cache is in server memory, so on serverless hosting it does little to prevent this. The per-IP rate limit does not stop many visitors adding up. The forecast is unaffected.
 - **Bengaluru's monitor and PM2.5.** On 2026-11-26 the monitor chosen for Bengaluru reported PM10 but no PM2.5, so the page shows no 24-hour air level and says why. It does not fall back to another pollutant.
 - **Reading lag.** CPCB readings usually reach OpenAQ a few hours late; the reading's time is shown.
 - **One monitor stands for a city**, chosen nearest the city centre among those with a fresh reading.
-- **A plan can be up to an hour old** and may quote an earlier reading than the page now shows; it states which.
+- **A plan can be up to three hours old**: it may quote an earlier reading, or suggest a time that has since passed. It states when it was generated and from which reading.
+- **Free-tier availability is poor across all four models.** On 2026-11-26 the primary, `gemini-3.5-flash-lite`, returned 503 on three of five attempts shortly after being made first, and the others returned 503, timeouts, 429 or unreadable output at various times. The pre-warm and the three-hour cache are the mitigation; model order alone is not.
 - **Reading age uses the device clock**; a wrong clock gives a wrong "hours ago".
 - The validator limits listed under [GenAI architecture](#genai-architecture).
 

@@ -1,25 +1,16 @@
 /**
- * The hour a plan belongs to. The page's forecast box and the plan writer both
- * use these, so a plan reused anywhere in the hour talks about the same
- * stretch the page shows.
- *
- * assumptions.ts#plan-hour
+ * How long a plan is reused. assumptions.ts#plan-lifetime
  */
 
 const IST_OFFSET_MS = 5.5 * 3_600_000;
-const HOUR_MS = 3_600_000;
 
-/** Start of the Indian clock hour containing `now` (the plan cache key). */
-export function planHour(now: Date): string {
-  return new Date(Math.floor((now.getTime() + IST_OFFSET_MS) / HOUR_MS) * HOUR_MS - IST_OFFSET_MS).toISOString();
-}
+/** A generated plan is served again for this long, then regenerated. */
+export const PLAN_TTL_SECONDS = 3 * 3600;
 
 /**
- * The instant the best-window logic is evaluated at: the last minute of that
- * hour. Forecast points fall on the half hour in IST and stretches that began
- * up to 30 minutes earlier still count, so this offers the same upcoming
- * stretches as the real time does.
+ * The Indian calendar day, part of the cache key: a plan talks about "today",
+ * so it is never served after midnight.
  */
-export function planningTime(now: Date): Date {
-  return new Date(Date.parse(planHour(now)) + HOUR_MS - 60_000);
+export function planDay(now: Date): string {
+  return new Date(now.getTime() + IST_OFFSET_MS).toISOString().slice(0, 10);
 }

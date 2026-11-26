@@ -33,7 +33,8 @@ export type AssumptionId =
   | "window-indicative-category"
   | "window-materially-cleaner"
   | "window-routine-stretch"
-  | "plan-hour"
+  | "plan-lifetime"
+  | "forecast-day-parts"
   | "plan-concurrency"
   | "plan-model-budget"
   | "plan-model-chain"
@@ -180,12 +181,19 @@ export const ASSUMPTIONS: Readonly<Record<AssumptionId, Assumption>> = {
       "Free-tier quota is counted per model. Order set by the project owner from live runs (3.5 Flash-Lite about 1.3 s; 3.1 Flash-Lite timed out three times). The two Flash models showed a limit of 20 requests a day in their quota errors; the Lite limits are not published and were not confirmed. An unreadable answer moves to the next model; a plan the validator rejects does not.",
     usedIn: ["src/lib/plan/model-chain.ts", "src/lib/plan/gemini.ts"],
   },
-  "plan-hour": {
-    id: "plan-hour",
-    value: "One plan per city, language, answers and Indian clock hour; the forecast box is evaluated for the same hour",
+  "plan-lifetime": {
+    id: "plan-lifetime",
+    value: "One plan per city, language, answers and Indian day, reused for 3 hours; its generation time is shown",
     rationale:
-      "The free tier allows few model calls, so identical requests within an hour share one plan. The latest reading is not in the key; the plan shows when it was written and from which reading. Evaluating the window at the hour's last minute offers the same upcoming stretches as the real time.",
-    usedIn: ["src/lib/plan/clock.ts", "src/lib/plan/server.ts", "src/components/WindowPanel.tsx"],
+      "The free tier allows few model calls and testing time is unknown, so identical requests share one plan for three hours (set by the project owner). The staleness is disclosed beside the plan. The day is in the key because a plan talks about today. The forecast box on the page stays live.",
+    usedIn: ["src/lib/plan/clock.ts", "src/lib/plan/server.ts", "src/components/PlanPanel.tsx"],
+  },
+  "forecast-day-parts": {
+    id: "forecast-day-parts",
+    value: "Morning 05–12, afternoon 12–17, evening 17–22; indicative CPCB category of the mean of at least 3 upcoming forecast points",
+    rationale:
+      "Lets the plan speak about parts of the day from computed forecast data instead of guessing. Breakpoints are 24-hour, so these are a rough guide, and the plan card shows the same words it was given.",
+    usedIn: ["src/lib/plan/window.ts", "src/lib/plan/packet.ts"],
   },
   "plan-health-vocabulary": {
     id: "plan-health-vocabulary",

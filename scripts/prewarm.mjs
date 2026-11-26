@@ -5,18 +5,20 @@
  *   npm run prewarm                      # https://clear-hour.vercel.app
  *   npm run prewarm -- http://localhost:3000
  *
- * A plan is cached for its Indian clock hour only, and a new deployment starts
- * with an empty cache: run this after deploying, early in the hour in which the
- * testing happens. Each plan not already cached costs a model request.
+ * A plan is reused for three hours (never past midnight IST), and a new
+ * deployment starts with an empty cache. Each plan not already cached costs a
+ * model request; running this again while they are warm costs none.
  * Nothing is seeded or made up: these are ordinary requests to /api/plan.
  */
 
-import { SAMPLES } from "./samples.mjs";
+import { PLAN_TTL_HOURS, SAMPLES } from "./samples.mjs";
 
 const base = (process.argv[2] ?? "https://clear-hour.vercel.app").replace(/\/$/, "");
 const IST_OFFSET_MS = 5.5 * 3_600_000;
-const hourStart = (ms) => Math.floor((ms + IST_OFFSET_MS) / 3_600_000) * 3_600_000 - IST_OFFSET_MS;
-const ist = (ms) => new Date(ms).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit", second: "2-digit" });
+const ist = (ms) => new Date(ms).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit" });
+const nextMidnight = (ms) => Math.floor((ms + IST_OFFSET_MS) / 86_400_000 + 1) * 86_400_000 - IST_OFFSET_MS;
+/** When a plan written at `ms` stops being served. */
+const expiry = (ms) => Math.min(ms + PLAN_TTL_HOURS * 3_600_000, nextMidnight(ms));
 
 async function request({ locale, profile }) {
   try {
@@ -32,11 +34,9 @@ async function request({ locale, profile }) {
   }
 }
 
-const started = Date.now();
-const hour = hourStart(started);
-console.log(`Warming ${SAMPLES.length} sample plans on ${base} at ${ist(started)} IST`);
+console.log(`Warming ${SAMPLES.length} sample plans on ${base} at ${ist(Date.now())} IST`);
 
-let warm = 0;
+const expiries = [];
 for (const sample of SAMPLES) {
   const askedAt = Date.now();
   let r = await request(sample);
@@ -51,12 +51,17 @@ for (const sample of SAMPLES) {
   }
   // Ask again: only an identical plan proves it was stored.
   const again = await request(sample);
+  const written = Date.parse(r.plan.preparedAt);
   const stored = again.plan?.preparedAt === r.plan.preparedAt;
-  const age = Date.parse(r.plan.preparedAt) < askedAt - 5_000 ? "already cached" : "generated now";
-  console.log(`  ${sample.id} ${sample.label}: ${stored ? "WARM" : "NOT CONFIRMED"} (${age}, written ${ist(Date.parse(r.plan.preparedAt))} IST)`);
-  if (stored) warm++;
+  const age = written < askedAt - 5_000 ? "already cached" : "generated now";
+  console.log(`  ${sample.id} ${sample.label}: ${stored ? `WARM until ${ist(expiry(written))} IST` : "NOT CONFIRMED"} (${age}, written ${ist(written)} IST)`);
+  if (stored) expiries.push(expiry(written));
 }
 
-console.log(`\n${warm}/${SAMPLES.length} warm until ${ist(hour + 3_600_000)} IST (end of this clock hour).`);
-if (hourStart(Date.now()) !== hour) console.log("WARNING: the hour changed while warming. Run it again.");
-process.exitCode = warm === SAMPLES.length && hourStart(Date.now()) === hour ? 0 : 1;
+const all = expiries.length === SAMPLES.length;
+console.log(
+  all
+    ? `\nAll ${SAMPLES.length} warm until ${ist(Math.min(...expiries))} IST. The host can evict a cached entry early.`
+    : `\n${expiries.length}/${SAMPLES.length} warm. Run it again.`,
+);
+process.exitCode = all ? 0 : 1;

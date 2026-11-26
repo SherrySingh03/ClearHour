@@ -3,7 +3,6 @@
 import type { ReactNode } from "react";
 import { CITATIONS } from "@/lib/grounding/citations";
 import type { ForecastMissingReason, ForecastSeries, Grounded } from "@/lib/grounding/types";
-import { planningTime } from "@/lib/plan/clock";
 import { bestWindow, type Stretch, type WindowResult } from "@/lib/plan/window";
 import { describeWindow, todaysPoints } from "@/lib/view/describe";
 import { ForecastChart } from "./ForecastChart";
@@ -62,8 +61,7 @@ export function WindowPanel({ forecast, now, departureHour }: { forecast: Ground
     );
   }
 
-  // Evaluated for the clock hour, the same way the plan is (clock.ts).
-  const result = bestWindow({ forecast: forecast.data, now: planningTime(now), ...(departureHour === undefined ? {} : { departureHour }) });
+  const result = bestWindow({ forecast: forecast.data, now, ...(departureHour === undefined ? {} : { departureHour }) });
   const view = describeWindow(result, t, f);
   const { best, routine } = stretchesOf(result);
 

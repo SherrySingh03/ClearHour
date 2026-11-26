@@ -70,9 +70,17 @@ export type RefDetail =
 export interface PlanResponse {
   readonly plan: Plan;
   readonly refs: Readonly<Record<string, RefDetail>>;
+  /** The forecast outlook the writer was given, so its claims can be checked on screen. */
+  readonly outlook: readonly OutlookLine[];
 }
 
-/** A plan as served: reusable for an hour, so it says when it was written and from which reading. */
+/** Localized words: a part of the day and its indicative forecast category. */
+export interface OutlookLine {
+  readonly part: string;
+  readonly category: string;
+}
+
+/** A plan as served: reused for up to three hours, so it says when it was written and from which reading. */
 export interface PreparedPlan extends PlanResponse {
   readonly preparedAt: string;
   /** Time of the latest reading the writer was given, or null if it had none. */

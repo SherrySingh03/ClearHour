@@ -11,6 +11,7 @@
 
 import type { AssumptionId } from "../../assumptions";
 import type { CommuteMode, CookingFuel } from "../../profile/types";
+import type { DayPart } from "../../plan/window";
 import type { FactorId, FactorUnit } from "../../sourced/emissionFactors";
 import type { WithheldReason } from "../../sourced/swaps";
 import type {
@@ -103,6 +104,7 @@ export interface UiStrings {
   readonly healthStatementIsTranslation: string | null;
   readonly window: {
     readonly badge: string;
+    readonly dayParts: Readonly<Record<DayPart, string>>;
     readonly cleanerThanRoutine: Fn<{ best: string; routine: string }>;
     readonly routineIsFine: Fn<{ routine: string }>;
     readonly clearBest: Fn<{ best: string }>;
@@ -189,8 +191,9 @@ export interface UiStrings {
     readonly loading: string;
     /** Any plan failure. Says what on the page still works, given what is actually there. */
     readonly unavailable: Fn<{ reading: boolean; forecast: boolean }>;
-    /** A plan is reused for up to an hour, so it says when it was written and from what. */
-    readonly preparedAt: Fn<{ time: string; reading: string | null }>;
+    /** A plan is reused for up to three hours, so it says when it was generated and from what. */
+    readonly preparedAt: Fn<{ time: string; ago: string; reading: string | null }>;
+    readonly outlookUsed: Fn<{ items: readonly { part: string; category: string }[] }>;
     readonly retry: string;
     readonly gapsIntro: string;
     readonly seeForecast: string;
@@ -333,6 +336,7 @@ export const en: UiStrings = {
   healthStatementIsTranslation: null,
   window: {
     badge: "Prediction for today",
+    dayParts: { morning: "morning", afternoon: "afternoon", evening: "evening" },
     cleanerThanRoutine: ({ best, routine }) => `Around ${best} looks clearly cleaner than when you usually leave (${routine})`,
     routineIsFine: ({ routine }) => `No other time today looks clearly cleaner than when you usually leave (${routine})`,
     clearBest: ({ best }) => `Cleanest time to be outside today: around ${best}`,
@@ -457,8 +461,11 @@ export const en: UiStrings = {
       if (reading) return `${base} The readings above are live and don't depend on it.`;
       return base;
     },
-    preparedAt: ({ time, reading }) =>
-      reading === null ? `Written at ${time}.` : `Written at ${time}, from the reading for ${reading}. The page above may show a newer one.`,
+    preparedAt: ({ time, ago, reading }) => {
+      const from = reading === null ? "" : `, from the reading for ${reading}`;
+      return `Plan generated at ${time} (${ago})${from}. The readings above may be newer, and the best time may have changed.`;
+    },
+    outlookUsed: ({ items }) => `Forecast it used (rough guide): ${items.map((i) => `${i.part} ${i.category}`).join(", ")}.`,
     retry: "Try again",
     gapsIntro: "This plan is missing:",
     seeForecast: "See the prediction above",

@@ -50,7 +50,7 @@ export function planJsonSchema(a: PlanAllowance): Record<string, unknown> {
 }
 
 export async function synthesizePlan(input: PlanInput, model: PlanModel): Promise<Grounded<PlanResponse, PlanFailure>> {
-  const { packet, allowance, refs } = buildPlanInput(input);
+  const { packet, allowance, refs, outlook } = buildPlanInput(input);
   let text: string;
   try {
     text = await model({ system: SYSTEM_PROMPT, user: JSON.stringify(packet), schema: planJsonSchema(allowance) });
@@ -66,5 +66,5 @@ export async function synthesizePlan(input: PlanInput, model: PlanModel): Promis
   const v = validatePlan(raw, allowance);
   if (!v.ok) return v.detail === undefined ? missing(v.reason) : missing(v.reason, v.detail);
   const used = Object.fromEntries(v.data.steps.map((s) => [s.refId, refs[s.refId]!]));
-  return ok({ plan: v.data, refs: used });
+  return ok({ plan: v.data, refs: used, outlook });
 }

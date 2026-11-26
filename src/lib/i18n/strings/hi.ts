@@ -134,6 +134,7 @@ export const hi: UiStrings = {
   healthStatementIsTranslation: "CPCB के अंग्रेज़ी वक्तव्य का Clearhour द्वारा अनुवाद",
   window: {
     badge: "आज का अनुमान",
+    dayParts: { morning: "सुबह", afternoon: "दोपहर", evening: "शाम" },
     cleanerThanRoutine: ({ best, routine }) => `लगभग ${best} का समय आपके आम तौर पर निकलने के घंटों (${routine}) से साफ़ तौर पर बेहतर लगता है`,
     routineIsFine: ({ routine }) => `आज कोई और समय आपके आम तौर पर निकलने के घंटों (${routine}) से साफ़ तौर पर बेहतर नहीं लगता`,
     clearBest: ({ best }) => `आज बाहर रहने का सबसे साफ़ समय: लगभग ${best}`,
@@ -259,8 +260,11 @@ export const hi: UiStrings = {
       if (reading) return `${base} ऊपर की रीडिंग लाइव हैं और इस पर निर्भर नहीं हैं।`;
       return base;
     },
-    preparedAt: ({ time, reading }) =>
-      reading === null ? `${time} पर लिखी गई।` : `${time} पर, ${reading} की रीडिंग से लिखी गई। ऊपर पेज पर नई रीडिंग हो सकती है।`,
+    preparedAt: ({ time, ago, reading }) => {
+      const from = reading === null ? "" : `, ${reading} की रीडिंग से`;
+      return `योजना ${time} पर बनी (${ago})${from}। ऊपर की रीडिंग नई हो सकती है, और सबसे अच्छा समय बदल सकता है।`;
+    },
+    outlookUsed: ({ items }) => `इसमें इस्तेमाल पूर्वानुमान (मोटा अंदाज़ा): ${items.map((i) => `${i.part} ${i.category}`).join(", ")}।`,
     retry: "फिर कोशिश करें",
     gapsIntro: "इस योजना में यह नहीं है:",
     seeForecast: "ऊपर अनुमान देखें",

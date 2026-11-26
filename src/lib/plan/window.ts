@@ -168,3 +168,38 @@ function againstBaseline(upcoming: readonly Stretch[], best: Stretch, routinePas
     ? { verdict: "clear-best", best, baseline, comparison, routinePassed }
     : { verdict: "no-clear-best", cleanest: best, baseline, comparison, routinePassed };
 }
+
+/** assumptions.ts#forecast-day-parts: local clock hours, [start, end) */
+export const DAY_PARTS = [
+  { part: "morning", from: OUTDOOR_START_HOUR, to: 12 },
+  { part: "afternoon", from: 12, to: 17 },
+  { part: "evening", from: 17, to: OUTDOOR_END_HOUR },
+] as const;
+export type DayPart = (typeof DAY_PARTS)[number]["part"];
+
+export interface PartOutlook {
+  readonly part: DayPart;
+  /** Indicative: a CPCB category applied to a few hours of forecast mean. */
+  readonly indicativeCategory: NaqiCategory;
+}
+
+/**
+ * How each part of today that is still ahead looks in the FORECAST, as a
+ * category word. A part with fewer than STRETCH_POINTS upcoming points is
+ * left out rather than guessed.
+ */
+export function dayOutlook(forecast: ForecastSeries, now: Date): PartOutlook[] {
+  const today = localDayKey(now.getTime());
+  const upcoming = forecast.points.filter((p) => {
+    const t = Date.parse(p.timeUtc);
+    return localDayKey(t) === today && t >= now.getTime() - 30 * 60_000;
+  });
+  return DAY_PARTS.flatMap(({ part, from, to }) => {
+    const values = upcoming.flatMap((p) => {
+      const h = localHour(Date.parse(p.timeUtc));
+      return h >= from && h < to && p.pm25 !== null ? [p.pm25] : [];
+    });
+    if (values.length < STRETCH_POINTS) return [];
+    return [{ part, indicativeCategory: naqiCategory("pm25", values.reduce((a, b) => a + b, 0) / values.length) }];
+  });
+}

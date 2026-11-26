@@ -1,27 +1,48 @@
 import { describe, expect, it } from "vitest";
 import { classifyModelError } from "@/lib/plan/model-errors";
 import { numberTokens } from "@/lib/plan/numbers";
-import { planHour, planningTime } from "@/lib/plan/clock";
+import { PLAN_TTL_SECONDS, planDay } from "@/lib/plan/clock";
+import { buildPlanInput } from "@/lib/plan/packet";
+import { dayOutlook } from "@/lib/plan/window";
+import { PLAN_TTL_HOURS } from "../scripts/samples.mjs";
 import { synthesizePlan } from "@/lib/plan/synthesize";
-import { input } from "./planFixtures";
+import { input, NOW, snapshotWithStation } from "./planFixtures";
 
-describe("plan hour", () => {
-  it("is the Indian clock hour, so every minute of it shares one key", () => {
-    // 10:00–10:59 IST is 04:30–05:29 UTC
-    for (const t of ["04:30:00", "04:59:59", "05:00:00", "05:29:59"]) expect(planHour(new Date(`2026-11-25T${t}Z`))).toBe("2026-11-25T04:30:00.000Z");
-    expect(planHour(new Date("2026-11-25T05:30:00Z"))).toBe("2026-11-25T05:30:00.000Z");
-    expect(planningTime(new Date("2026-11-25T04:31:00Z")).toISOString()).toBe("2026-11-25T05:29:00.000Z");
+describe("plan lifetime", () => {
+  it("is three hours, and the pre-warm script agrees", () => {
+    expect(PLAN_TTL_SECONDS).toBe(10_800);
+    expect(PLAN_TTL_HOURS * 3600).toBe(PLAN_TTL_SECONDS);
   });
 
-  it("offers the same upcoming forecast points as the real time, apart from the instant a point expires", () => {
-    // Points fall at :00 UTC; one counts as upcoming if it started no more than 30 minutes ago.
-    const firstUpcoming = (t: number) => Math.ceil((t - 30 * 60_000) / 3_600_000);
-    const base = Date.parse("2026-11-25T00:30:00Z");
-    for (let minute = 0; minute < 24 * 60; minute++) {
-      if (minute % 60 === 0) continue;
-      const now = base + minute * 60_000;
-      expect(firstUpcoming(planningTime(new Date(now)).getTime()), new Date(now).toISOString()).toBe(firstUpcoming(now));
-    }
+  it("keys on the Indian day, so a plan about 'today' is never served after midnight", () => {
+    expect(planDay(new Date("2026-11-25T18:29:59Z"))).toBe("2026-11-25"); // 23:59:59 IST
+    expect(planDay(new Date("2026-11-25T18:30:00Z"))).toBe("2026-11-26"); // 00:00 IST
+  });
+});
+
+describe("forecast outlook given to the plan writer", () => {
+  const series = snapshotWithStation.forecast.ok ? snapshotWithStation.forecast.data : null;
+
+  it("describes each part of today still ahead, as a category word", () => {
+    // fixture: 150 µg/m³ from 05:00 to 09:00 IST, 290 otherwise; the morning mean (210) is "very poor"
+    expect(dayOutlook(series!, NOW)).toEqual([
+      { part: "morning", indicativeCategory: "very-poor" },
+      { part: "afternoon", indicativeCategory: "severe" },
+      { part: "evening", indicativeCategory: "severe" },
+    ]);
+  });
+
+  it("drops parts that are over instead of describing them", () => {
+    const at6pm = new Date("2026-11-25T12:30:00Z");
+    expect(dayOutlook(series!, at6pm).map((o) => o.part)).toEqual(["evening"]);
+  });
+
+  it("is in the packet in words only, labelled as a forecast, and returned for the screen", () => {
+    const { packet, outlook, allowance } = buildPlanInput(input);
+    expect(outlook).toHaveLength(3);
+    expect(packet.forecast).toMatchObject({ isModelPrediction: true, outlookByPartOfDay: outlook });
+    expect(JSON.stringify(outlook)).not.toMatch(/\d/);
+    expect(allowance.tokens.size).toBeGreaterThan(0);
   });
 });
 
