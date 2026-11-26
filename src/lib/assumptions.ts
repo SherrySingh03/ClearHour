@@ -33,9 +33,10 @@ export type AssumptionId =
   | "window-indicative-category"
   | "window-materially-cleaner"
   | "window-routine-stretch"
-  | "plan-time-bucket"
+  | "plan-hour"
   | "plan-concurrency"
   | "plan-model-budget"
+  | "plan-model-chain"
   | "distance-rounding"
   | "plan-health-vocabulary"
   | "plan-timeframe-binding"
@@ -168,15 +169,23 @@ export const ASSUMPTIONS: Readonly<Record<AssumptionId, Assumption>> = {
   },
   "plan-model-budget": {
     id: "plan-model-budget",
-    value: "50 s total per plan; fallback model only on 5xx/timeout with ≥ 15 s left",
-    rationale: "Live plans took 5–18 s. One shared deadline stops primary + fallback from doubling the time a request can hold. No fallback on 429 (quota), which a second model would only spend faster.",
-    usedIn: ["src/lib/plan/gemini.ts"],
+    value: "50 s total per plan; at most 20 s per model; no new attempt with under 8 s left",
+    rationale: "Flash-Lite plans took 2–5 s in testing. One shared deadline stops the chain from multiplying the time a request can hold; the per-model cap leaves room to try the next.",
+    usedIn: ["src/lib/plan/model-chain.ts"],
   },
-  "plan-time-bucket": {
-    id: "plan-time-bucket",
-    value: "15 minutes",
-    rationale: "Plans are cached per (city, language, profile, 15-minute bucket). The best window depends on the time of day, so a plan is never reused across buckets; inside one it is identical, which bounds Gemini calls.",
-    usedIn: ["src/lib/plan/request.ts", "src/lib/plan/server.ts"],
+  "plan-model-chain": {
+    id: "plan-model-chain",
+    value: "gemini-3.1-flash-lite → 3.5-flash-lite → 3.8-flash → 3.6-flash; next model on quota, overload, timeout or retired model",
+    rationale:
+      "Free-tier quota is counted per model. Order chosen by the project owner from real plan requests (both Lite models passed the validator in 2–5 s). The two Flash models showed a limit of 20 requests a day in their quota errors; the Lite limits are not published and were not confirmed. A rejected plan is not retried on another model.",
+    usedIn: ["src/lib/plan/model-chain.ts", "src/lib/plan/gemini.ts"],
+  },
+  "plan-hour": {
+    id: "plan-hour",
+    value: "One plan per city, language, answers and Indian clock hour; the forecast box is evaluated for the same hour",
+    rationale:
+      "The free tier allows few model calls, so identical requests within an hour share one plan. The latest reading is not in the key; the plan shows when it was written and from which reading. Evaluating the window at the hour's last minute offers the same upcoming stretches as the real time.",
+    usedIn: ["src/lib/plan/clock.ts", "src/lib/plan/server.ts", "src/components/WindowPanel.tsx"],
   },
   "plan-health-vocabulary": {
     id: "plan-health-vocabulary",

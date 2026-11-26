@@ -6,6 +6,7 @@
  */
 
 import { missing, ok, type Grounded } from "../grounding/types";
+import { classifyModelError, type ModelFailureKind } from "./model-errors";
 import { buildPlanInput, type PlanInput } from "./packet";
 import { SYSTEM_PROMPT } from "./prompt";
 import type { PlanAllowance, PlanResponse } from "./types";
@@ -19,7 +20,7 @@ export interface PlanModelRequest {
 /** Returns the model's raw text. Throws on transport failure. */
 export type PlanModel = (req: PlanModelRequest) => Promise<string>;
 
-export type PlanFailure = PlanRejection | "model-error" | "invalid-json";
+export type PlanFailure = PlanRejection | ModelFailureKind | "invalid-json";
 
 /** JSON Schema for structured output. Length limits are enforced by the validator. */
 export function planJsonSchema(a: PlanAllowance): Record<string, unknown> {
@@ -53,8 +54,8 @@ export async function synthesizePlan(input: PlanInput, model: PlanModel): Promis
   let text: string;
   try {
     text = await model({ system: SYSTEM_PROMPT, user: JSON.stringify(packet), schema: planJsonSchema(allowance) });
-  } catch {
-    return missing("model-error");
+  } catch (e) {
+    return missing(classifyModelError(e).kind);
   }
   let raw: unknown;
   try {

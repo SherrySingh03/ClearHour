@@ -11,8 +11,11 @@
  *  - health: no health, medical, safety, exposure or caution wording, in any
  *    UI language (lexicon.ts); the UI shows CPCB's verbatim statement
  *  - numbers: no spelled-out quantities; no digits from other scripts or
- *    numeric symbols; every numeral appears in the input; and a number next
- *    to a unit (µg/m³, kg, %) appeared with that same unit in the input
+ *    numeric symbols; every number must be in the input AS THE SAME KIND (clock
+ *    time, µg/m³, km, hours...), and the only unitless one allowed is the AQI
+ *
+ * Rejection details carry codes and numbers only, never the model's text, so
+ * they are safe to log.
  *  - timeframes: a sentence quoting a measured or predicted number says what
  *    it is (24-hour AQI as 24-hour and never "now"; the latest reading never
  *    "now" or a forecast). Savings and forecast differences are never given
@@ -23,8 +26,8 @@
 import { z } from "zod";
 import { missing, ok, type Grounded } from "../grounding/types";
 import { containsNumberWord, healthConcept, mentionsForecast, mentionsLast24Hours, mentionsNow } from "./lexicon";
-import { extractNumbers, extractUnitNumbers, hasUnsupportedNumerals, normalise, numberOccurrences, sentences } from "./numbers";
-import type { NumberBinding, NumberRole, Plan, PlanAllowance } from "./types";
+import { hasUnsupportedNumerals, normalise, numberTokens, sentences } from "./numbers";
+import type { NumberRole, Plan, PlanAllowance } from "./types";
 
 export const LIMITS = { headline: 160, note: 240, maxSteps: 5 } as const;
 
@@ -64,14 +67,13 @@ const ROLE_OK: Readonly<Record<NumberRole, (sentence: string) => boolean>> = {
 /**
  * The first number in `text` whose sentence misstates what it is, or null.
  * A number can match several bindings (the same value shown twice); the
- * sentence passes if it fits any one of them. A unitless number matches a
- * binding of any unit; a number with another unit (km, kg, hours) matches none.
+ * sentence passes if it fits any one of them.
  */
-function misboundNumber(text: string, bindings: readonly NumberBinding[]): string | null {
+function misboundNumber(text: string, a: PlanAllowance): string | null {
   for (const raw of sentences(text)) {
     const sentence = normalise(raw);
-    for (const occ of numberOccurrences(sentence)) {
-      const candidates = bindings.filter((b) => b.value === occ.value && (occ.unit === null || b.unit === occ.unit));
+    for (const occ of numberTokens(sentence, a.names)) {
+      const candidates = a.bindings.filter((b) => b.value === occ.value && occ.kind === (b.unit ?? "bare"));
       if (candidates.length > 0 && !candidates.some((b) => ROLE_OK[b.role](sentence))) return `${occ.value} (${candidates.map((b) => b.role).join("|")})`;
     }
   }
@@ -96,8 +98,8 @@ export function validatePlan(raw: unknown, a: PlanAllowance): Grounded<Plan, Pla
       (s.kind === "window" && s.refId === "window") ||
       (s.kind === "guidance" && a.guidanceIds.has(s.refId)) ||
       (s.kind === "swap" && a.swapIds.has(s.refId));
-    if (!known) return missing("unknown-ref", s.refId);
-    if (seen.has(s.refId)) return missing("duplicate-ref", s.refId);
+    if (!known) return missing("unknown-ref", s.kind);
+    if (seen.has(s.refId)) return missing("duplicate-ref", s.kind);
     seen.add(s.refId);
     if (s.kind === "window" && !a.windowAvailable) return missing("window-unavailable");
   }
@@ -109,17 +111,17 @@ export function validatePlan(raw: unknown, a: PlanAllowance): Grounded<Plan, Pla
   const texts = [p.headline, ...p.steps.map((s) => s.note)];
   for (const text of texts) {
     if (LINK.test(text)) return missing("link");
-    if (healthConcept(text) !== null) return missing("health-claim", text);
-    if (containsNumberWord(text)) return missing("number-word", text);
+    const concept = healthConcept(text);
+    if (concept !== null) return missing("health-claim", concept);
+    if (containsNumberWord(text)) return missing("number-word");
     if (hasUnsupportedNumerals(text)) return missing("unknown-number", "unsupported-numerals");
-    const stray = extractNumbers(text).find((n) => !a.numbers.has(n));
-    if (stray !== undefined) return missing("unknown-number", stray);
-    const units = extractUnitNumbers(text);
-    for (const unit of ["ugm3", "kg", "pct"] as const) {
-      const misused = units[unit].find((n) => !a.unitNumbers[unit].has(n));
-      if (misused !== undefined) return missing("unknown-number", `${misused} ${unit}`);
+    for (const n of numberTokens(text, a.names)) {
+      if (a.tokens.has(`${n.kind}:${n.value}`)) continue;
+      // In the input, but not as this kind of thing (a clock time reused as a limit).
+      if (a.known.has(n.value)) return missing("number-role", `${n.value} as ${n.kind}`);
+      return missing("unknown-number", n.value.slice(0, 20));
     }
-    const misbound = misboundNumber(text, a.bindings);
+    const misbound = misboundNumber(text, a);
     if (misbound !== null) return missing("number-role", misbound);
   }
 

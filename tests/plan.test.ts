@@ -11,8 +11,9 @@ const withStep = (i: number, note: string) => ({ ...validPlan, steps: validPlan.
 describe("plan packet", () => {
   it("collects every number the page shows, and nothing for the model to invent", () => {
     const { allowance, packet } = buildPlanInput(input);
-    for (const n of ["45", "220", "2.6", "12", "5", "8", "30", "24"]) expect(allowance.numbers.has(n), n).toBe(true);
-    expect(allowance.numbers.has("37")).toBe(false);
+    for (const token of ["ugm3:45", "bare:220", "km:2.6", "km:12", "time:5:30", "time:8:30", "time:9", "hours:24", "hours:3"])
+      expect(allowance.tokens.has(token), token).toBe(true);
+    expect(allowance.known.has("37")).toBe(false);
     expect(allowance.gaps).toEqual([]);
     expect(JSON.stringify(packet)).not.toContain("Breathing discomfort"); // no health statement is given to the model
   });
@@ -21,10 +22,12 @@ describe("plan packet", () => {
     const { allowance, packet } = buildPlanInput(input);
     const sent = JSON.stringify(packet);
     expect(sent).not.toMatch(/kg|%|saving|less CO/i);
-    expect(allowance.unitNumbers.kg.size).toBe(0);
-    expect(allowance.unitNumbers.pct.size).toBe(0);
-    // The only concentration it may quote is the latest reading.
-    expect([...allowance.unitNumbers.ugm3]).toEqual(["45"]);
+    const of = (kind: string) => [...allowance.tokens].filter((x) => x.startsWith(`${kind}:`));
+    expect(of("kg")).toEqual([]);
+    expect(of("pct")).toEqual([]);
+    // The only concentration it may quote is the latest reading, and the only unitless number the AQI.
+    expect(of("ugm3")).toEqual(["ugm3:45"]);
+    expect(of("bare")).toEqual(["bare:220"]);
   });
 
   it("records missing grounding data as gaps the plan must acknowledge", () => {
@@ -71,7 +74,10 @@ describe("validator rejects the WHOLE plan", () => {
     "Piped gas gives 11% less CO₂.",
     "The forecast shows 69 µg/m³ more fine dust later.",
   ])("rejects any amount of saving or difference, right or reversed: %s", async (note) => {
-    expect(await synthesizePlan(input, fake(withStep(2, note)))).toMatchObject({ ok: false, reason: "unknown-number" });
+    // "unknown-number" if the value is nowhere in the input, "number-role" if it is there as something else (11 of "11:30").
+    const r = await synthesizePlan(input, fake(withStep(2, note)));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(["unknown-number", "number-role"]).toContain(r.reason);
   });
 
   it("an injected health claim fails the whole plan (English)", async () => {
@@ -163,8 +169,8 @@ describe("number gate cannot be bypassed", () => {
   });
 
   it("rejects a real input number reused with the wrong unit (AQI 220 written as a concentration)", () => {
-    expect(check("PM2.5 stands at 220 µg/m³ today.")).toEqual({ ok: false, reason: "unknown-number", detail: "220 ugm3" });
-    expect(check("The bus avoids 45 kg of CO₂.")).toEqual({ ok: false, reason: "unknown-number", detail: "45 kg" });
+    expect(check("PM2.5 stands at 220 µg/m³ today.")).toEqual({ ok: false, reason: "number-role", detail: "220 as ugm3" });
+    expect(check("The bus avoids 45 kg of CO₂.")).toEqual({ ok: false, reason: "number-role", detail: "45 as kg" });
   });
 
   it("still accepts numbers used with their own unit", () => {
@@ -213,6 +219,56 @@ describe("numbers are bound to what they are (timeframe), not just to a unit", (
   });
 
   it("clock times and other units never trip the binding", () => {
-    expect(check("Leave at 4:45 am and take the bus on your 12 km commute.").ok).toBe(true);
+    expect(check("Leave at 5:30 am and take the bus on your 12 km commute.").ok).toBe(true);
+  });
+});
+
+describe("a number keeps the kind it had in the input", () => {
+  const { allowance } = buildPlanInput(input);
+  const check = (note: string, a = allowance) => validatePlan(withStep(2, note), a);
+
+  it("the fabricated threshold: the 30 of '8:30' cannot become a limit", () => {
+    expect(check("Keep fine dust under 30 today.")).toEqual({ ok: false, reason: "number-role", detail: "30 as bare" });
+    expect(check("Keep fine dust under 30 µg/m³ today.")).toEqual({ ok: false, reason: "number-role", detail: "30 as ugm3" });
+    expect(check("आज बारीक धूल 30 से नीचे रखें।", buildPlanInput({ ...input, locale: "hi" }).allowance)).toMatchObject({ ok: false, reason: "number-role" });
+  });
+
+  it("the mirror: the same times written as times still pass", () => {
+    expect(check("Leave around 5:30 am, before your usual 9 am start.").ok).toBe(true);
+    expect(check("If you air the room, do it between 12 and 4 pm.").ok).toBe(true);
+  });
+
+  it("the other mirror: a measurement cannot become a time", () => {
+    expect(check("Leave at 45 pm.")).toEqual({ ok: false, reason: "number-role", detail: "45 as time" });
+    expect(check("Leave at 8:45.")).toMatchObject({ ok: false, reason: "unknown-number" });
+  });
+
+  it.each([
+    ["a distance as a limit", "The limit is 12 for fine dust."],
+    ["a station distance as a level", "Dust above 2.6 matters."],
+    ["a duration as a limit", "Stay below 24 today."],
+    ["a reading without its unit", "The latest reading was 45."],
+    ["a time as a distance", "Walk 30 km."],
+  ])("rejects %s", (_, note) => {
+    expect(check(note)).toMatchObject({ ok: false, reason: "number-role" });
+  });
+
+  it("keeps the legitimate forms: reading with unit, AQI as a 24-hour value, the commute distance", () => {
+    expect(check("The latest reading was 45 µg/m³ at the station.").ok).toBe(true);
+    expect(check("The 24-hour AQI was 220.").ok).toBe(true);
+    expect(check("Your 12 km commute can be done by bus.").ok).toBe(true);
+  });
+
+  it("ignores digits that belong to the station's name, and nothing else", () => {
+    const station = snapshotWithStation.coverage;
+    if (station.status !== "station") throw new Error("fixture");
+    const named = buildPlanInput({ ...input, snapshot: { ...snapshotWithStation, coverage: { ...station, station: { ...station.station, name: "Sector 62, Noida" } } } }).allowance;
+    expect(check("The Sector 62, Noida station reported it.", named).ok).toBe(true);
+    expect(check("Keep it under 62.", named)).toMatchObject({ ok: false });
+  });
+
+  it("rejection details carry no model text", () => {
+    expect(check("Keep windows shut so asthma stays away.")).toEqual({ ok: false, reason: "health-claim", detail: "asthma" });
+    expect(check("Open the windows twice.")).toEqual({ ok: false, reason: "number-word" });
   });
 });

@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { MAX_BODY_BYTES, parsePlanRequest, timeBucket } from "@/lib/plan/request";
+import { MAX_BODY_BYTES, parsePlanRequest } from "@/lib/plan/request";
 
 const profile = {
   cityId: "delhi",
@@ -32,9 +32,6 @@ describe("POST /api/plan input validation", () => {
     expect(await parsePlanRequest(r)).toBeNull();
   });
 
-  it("buckets time to 15 minutes for the cache key", () => {
-    expect(timeBucket(new Date("2026-11-25T08:44:59Z"))).toBe("2026-11-25T08:30:00.000Z");
-  });
 });
 
 describe("no data-override paths ship in the app", () => {

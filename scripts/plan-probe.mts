@@ -7,7 +7,8 @@
 import nextEnv from "@next/env";
 import { createOpenAqClient, findCity, getGroundingSnapshot } from "../src/lib/grounding/index";
 import { toPublicSnapshot } from "../src/lib/grounding/public";
-import { createGeminiModel, DEFAULT_GEMINI_MODEL } from "../src/lib/plan/gemini";
+import { createGeminiModel } from "../src/lib/plan/gemini";
+import { MODEL_CHAIN } from "../src/lib/plan/model-chain";
 import { synthesizePlan } from "../src/lib/plan/synthesize";
 import type { HouseholdProfile } from "../src/lib/profile/types";
 
@@ -17,7 +18,7 @@ if (!key) throw new Error("GEMINI_API_KEY not set");
 const cities = process.argv.slice(2).length ? process.argv.slice(2) : ["delhi"];
 const openaq = createOpenAqClient({ apiKey: process.env.OPENAQ_API_KEY });
 const model = createGeminiModel(key);
-console.log(`model: ${process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL}`);
+console.log(`models: ${[process.env.GEMINI_MODEL, ...MODEL_CHAIN].filter(Boolean).join(' → ')}`);
 
 let pass = 0, total = 0;
 for (const cityId of cities) {
@@ -29,7 +30,7 @@ for (const cityId of cities) {
     total++;
     const t0 = Date.now();
     const r = await synthesizePlan({ snapshot, profile, locale, now: new Date() }, async (req) => {
-      try { return await model(req); } catch (e) { console.log(`   model error: ${e instanceof Error ? e.message.slice(0, 200) : e}`); throw e; }
+      try { return await model(req); } catch (e) { console.log(`   every model failed: ${e instanceof Error ? e.message : e}`); throw e; }
     });
     const ms = Date.now() - t0;
     if (r.ok) {

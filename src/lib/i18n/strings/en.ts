@@ -185,14 +185,18 @@ export interface UiStrings {
   readonly plan: {
     readonly title: string;
     readonly byline: string;
+    readonly get: string;
     readonly loading: string;
-    readonly failed: string;
+    /** Any plan failure. Says what on the page still works, given what is actually there. */
+    readonly unavailable: Fn<{ reading: boolean; forecast: boolean }>;
+    /** A plan is reused for up to an hour, so it says when it was written and from what. */
+    readonly preparedAt: Fn<{ time: string; reading: string | null }>;
     readonly retry: string;
     readonly gapsIntro: string;
     readonly seeForecast: string;
     readonly source: Fn<{ title: string }>;
   };
-  readonly errors: { readonly network: string };
+  readonly errors: { readonly unavailable: string; readonly busy: string };
 }
 
 export const en: UiStrings = {
@@ -443,13 +447,25 @@ export const en: UiStrings = {
   },
   plan: {
     title: "Your plan for today",
-    byline: "Written by Google's Gemini AI from what's on this page and your answers, then checked before it's shown.",
+    byline: "Optional. A short summary written by Google's Gemini AI from this page and your answers, then checked before it's shown.",
+    get: "Get today's plan",
     loading: "Preparing your plan…",
-    failed: "Your plan couldn't be prepared. Everything above is still accurate.",
+    unavailable: ({ reading, forecast }) => {
+      const base = "The plan is temporarily unavailable.";
+      if (reading && forecast) return `${base} The readings and forecast above are live and don't depend on it.`;
+      if (forecast) return `${base} The forecast above is live and doesn't depend on it.`;
+      if (reading) return `${base} The readings above are live and don't depend on it.`;
+      return base;
+    },
+    preparedAt: ({ time, reading }) =>
+      reading === null ? `Written at ${time}.` : `Written at ${time}, from the reading for ${reading}. The page above may show a newer one.`,
     retry: "Try again",
     gapsIntro: "This plan is missing:",
     seeForecast: "See the prediction above",
     source: ({ title }) => `Source: ${title}`,
   },
-  errors: { network: "Couldn't load today's air. Check your connection and try again." },
+  errors: {
+    unavailable: "Today's air is temporarily unavailable. Try again in a minute.",
+    busy: "Too many requests in a short time. Wait a minute, then try again.",
+  },
 };

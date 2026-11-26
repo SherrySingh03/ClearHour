@@ -75,9 +75,3 @@ export async function parsePlanRequest(req: Request): Promise<PlanRequest | null
   if (!profile || profile.cityId !== b.data.cityId) return null;
   return { cityId: b.data.cityId, locale: b.data.locale, profile };
 }
-
-/** Plans are cached per 15-minute bucket: the best window depends on the time of day. */
-export function timeBucket(now: Date): string {
-  const ms = 15 * 60_000;
-  return new Date(Math.floor(now.getTime() / ms) * ms).toISOString();
-}

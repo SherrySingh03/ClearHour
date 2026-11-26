@@ -13,7 +13,7 @@ import { PlanPanel } from "./PlanPanel";
 import { SwapsPanel } from "./SwapsPanel";
 import { ForecastMark, WindowPanel } from "./WindowPanel";
 
-type Load = { status: "loading" } | { status: "error" } | { status: "ready"; snapshot: GroundingSnapshot; now: Date };
+type Load = { status: "loading" } | { status: "error"; busy: boolean } | { status: "ready"; snapshot: GroundingSnapshot; now: Date };
 
 export function Home({ profile, onEdit }: { profile: HouseholdProfile; onEdit: () => void }) {
   const { t, locale } = useLocale();
@@ -24,10 +24,10 @@ export function Home({ profile, onEdit }: { profile: HouseholdProfile; onEdit: (
     setLoad({ status: "loading" });
     try {
       const res = await fetch(`/api/grounding?city=${encodeURIComponent(profile.cityId)}`);
-      if (!res.ok) throw new Error(String(res.status));
+      if (!res.ok) return setLoad({ status: "error", busy: res.status === 429 });
       setLoad({ status: "ready", snapshot: (await res.json()) as GroundingSnapshot, now: new Date() });
     } catch {
-      setLoad({ status: "error" });
+      setLoad({ status: "error", busy: false });
     }
   }, [profile.cityId]);
 
@@ -69,7 +69,7 @@ export function Home({ profile, onEdit }: { profile: HouseholdProfile; onEdit: (
       {load.status === "loading" && <p className="mt-8 text-muted">{t.common.loading}</p>}
       {load.status === "error" && (
         <div className="mt-8">
-          <p>{t.errors.network}</p>
+          <p>{load.busy ? t.errors.busy : t.errors.unavailable}</p>
           <button type="button" onClick={() => void fetchSnapshot()} className="mt-3 rounded-full bg-ink px-5 py-2 text-smog">
             {t.common.retry}
           </button>
@@ -79,7 +79,11 @@ export function Home({ profile, onEdit }: { profile: HouseholdProfile; onEdit: (
         <div className="mt-3 space-y-3">
           <MeasuredPanel snapshot={load.snapshot} now={load.now} city={city?.names[locale] ?? ""} />
           <WindowPanel forecast={load.snapshot.forecast} now={load.now} departureHour={profile.commute.mode === "none" ? undefined : profile.commute.departureHour} />
-          <PlanPanel profile={profile} />
+          <PlanPanel
+            key={`${locale}:${JSON.stringify(profile)}`}
+            profile={profile}
+            live={{ reading: load.snapshot.measured.ok, forecast: load.snapshot.forecast.ok }}
+          />
           <IndoorPanel snapshot={load.snapshot} profile={profile} />
           <SwapsPanel profile={profile} />
         </div>

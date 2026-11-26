@@ -4,16 +4,12 @@ import { findCity } from "../grounding/cities";
 import { getPublicSnapshot } from "../grounding/server";
 import type { Locale } from "../i18n/locales";
 import type { HouseholdProfile } from "../profile/types";
+import { planningTime } from "./clock";
 import { createGeminiModel } from "./gemini";
 import { synthesizePlan, type PlanFailure } from "./synthesize";
-import type { PlanResponse } from "./types";
+import type { PreparedPlan } from "./types";
 
 export type PlanUnavailableReason = PlanFailure | "no-key" | "unknown-city";
-
-const REASONS: ReadonlySet<string> = new Set<PlanUnavailableReason>([
-  "schema", "unknown-ref", "duplicate-ref", "window-unavailable", "gaps-mismatch", "link", "health-claim",
-  "number-word", "unknown-number", "number-role", "wrong-language", "model-error", "invalid-json", "no-key", "unknown-city",
-]);
 
 export class PlanUnavailable extends Error {
   constructor(readonly reason: PlanUnavailableReason) {
@@ -22,30 +18,39 @@ export class PlanUnavailable extends Error {
 }
 
 /**
- * Errors thrown inside a "use cache" function lose their class on the way out,
- * so the reason is carried in the message and read back against a closed set.
- * Anything else logs as "unexpected"; nothing upstream is ever echoed.
+ * One plan per (city, language, profile, hour), shared across server instances
+ * (`use cache: remote`), so repeat requests cost no model calls. The reading is
+ * deliberately not part of the key.
+ *
+ * Failures throw, so they are never cached. Their reason is logged HERE: in
+ * production an error crossing the cache boundary arrives without its details.
  */
-export function planFailureReason(e: unknown): PlanUnavailableReason | "unexpected" {
-  const msg = e instanceof Error ? e.message : "";
-  return REASONS.has(msg) ? (msg as PlanUnavailableReason) : "unexpected";
-}
+export async function getPlan(cityId: string, locale: Locale, profile: HouseholdProfile, hourIso: string): Promise<PreparedPlan> {
+  "use cache: remote";
+  // The key changes every hour; revalidate is longer than that so a cached plan
+  // is never regenerated in the background.
+  cacheLife({ stale: 300, revalidate: 7200, expire: 10_800 });
 
-/**
- * Cached per (city, locale, profile, 15-minute bucket). Failures throw, so
- * they are never cached and the next request tries again.
- */
-export async function getPlan(cityId: string, locale: Locale, profile: HouseholdProfile, bucketIso: string): Promise<PlanResponse> {
-  "use cache";
-  cacheLife({ stale: 300, revalidate: 900, expire: 1800 });
+  const started = Date.now();
+  const log = (reason: string, detail?: string) =>
+    console.warn("[plan]", JSON.stringify({ reason, ...(detail === undefined ? {} : { detail }), city: cityId, locale, ms: Date.now() - started }));
+  try {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new PlanUnavailable("no-key");
+    const city = findCity(cityId);
+    if (!city) throw new PlanUnavailable("unknown-city");
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new PlanUnavailable("no-key");
-  const city = findCity(cityId);
-  if (!city) throw new PlanUnavailable("unknown-city");
-
-  const snapshot = await getPublicSnapshot(city.center.latitude, city.center.longitude);
-  const result = await synthesizePlan({ snapshot, profile, locale, now: new Date(bucketIso) }, createGeminiModel(apiKey));
-  if (!result.ok) throw new PlanUnavailable(result.reason);
-  return result.data;
+    const snapshot = await getPublicSnapshot(city.center.latitude, city.center.longitude);
+    const result = await synthesizePlan({ snapshot, profile, locale, now: planningTime(new Date(hourIso)) }, createGeminiModel(apiKey));
+    if (!result.ok) {
+      log(result.reason, result.detail);
+      throw new PlanUnavailable(result.reason);
+    }
+    log("ok");
+    const reading = snapshot.measured.ok ? snapshot.measured.data.latest.pm25 : undefined;
+    return { ...result.data, preparedAt: new Date().toISOString(), readingUtc: reading?.provenance.observedAt.utc ?? null };
+  } catch (e) {
+    if (!(e instanceof PlanUnavailable)) log("unexpected", e instanceof Error ? e.name : typeof e);
+    throw e;
+  }
 }

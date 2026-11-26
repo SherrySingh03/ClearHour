@@ -16,8 +16,8 @@ import type { HouseholdProfile } from "../profile/types";
 import { categorySignal, selectGuidance } from "../sourced/guidance";
 import { swapsFor } from "../sourced/swaps";
 import { bestWindow } from "./window";
-import { describeAge, describeSaving, describeWindow, swapTarget } from "../view/describe";
-import { extractNumbers, extractUnitNumbers } from "./numbers";
+import { describeSaving, describeWindow, swapTarget } from "../view/describe";
+import { numberTokens } from "./numbers";
 import type { GapCode, NumberBinding, PlanAllowance, RefDetail } from "./types";
 
 export interface PlanInput {
@@ -43,8 +43,8 @@ export function buildPlanInput({ snapshot, profile, locale, now }: PlanInput) {
     const pm25 = snapshot.measured.data.latest.pm25;
     const aqi = snapshot.measured.data.naqi24h.pm25;
     if (!aqi.ok) gaps.push(`aqi:${aqi.reason}`);
-    if (pm25) bindings.push({ value: extractNumbers(f.number(pm25.value))[0]!, unit: "ugm3", role: "latest-reading" });
-    if (aqi.ok) bindings.push({ value: extractNumbers(f.number(aqi.data.subIndex))[0]!, unit: null, role: "aqi-24h" });
+    if (pm25) bindings.push({ value: numberTokens(f.number(pm25.value))[0]!.value, unit: "ugm3", role: "latest-reading" });
+    if (aqi.ok) bindings.push({ value: numberTokens(f.number(aqi.data.subIndex))[0]!.value, unit: null, role: "aqi-24h" });
     // Key names carry the timeframe, so the model sees what each value is.
     measured = {
       available: true,
@@ -53,8 +53,8 @@ export function buildPlanInput({ snapshot, profile, locale, now }: PlanInput) {
       latestSingleHourReading: pm25
         ? {
             pm25: `${f.number(pm25.value)} ${t.common.unitUgm3}`,
+            // The time, not the age: a plan is reused for an hour and an age would go stale.
             readingTime: f.time(pm25.provenance.observedAt.utc),
-            readingAge: describeAge(pm25.provenance.observedAt.utc, now, t),
           }
         : null,
       aqi24hAverage: aqi.ok
@@ -126,23 +126,30 @@ export function buildPlanInput({ snapshot, profile, locale, now }: PlanInput) {
     gaps,
   };
 
-  const numbers = new Set<string>();
-  const unitNumbers = { ugm3: new Set<string>(), kg: new Set<string>(), pct: new Set<string>() };
+  const names = snapshot.coverage.status === "station" ? [snapshot.coverage.station.name] : [];
+  const tokens = new Set<string>();
+  const known = new Set<string>();
   const collect = (x: unknown): void => {
     if (typeof x === "string") {
-      extractNumbers(x).forEach((n) => numbers.add(n));
-      const u = extractUnitNumbers(x);
-      for (const k of ["ugm3", "kg", "pct"] as const) u[k].forEach((n) => unitNumbers[k].add(n));
+      for (const n of numberTokens(x, names)) {
+        known.add(n.value);
+        // "8:30" also makes "8" and "30" known (as misused, not invented).
+        n.value.split(":").forEach((part) => known.add(part));
+        if (n.kind !== "bare") tokens.add(`${n.kind}:${n.value}`);
+      }
     }
     else if (Array.isArray(x)) x.forEach(collect);
     else if (x && typeof x === "object") Object.values(x).forEach(collect);
   };
   collect(packet);
+  // The only unitless quantity a plan may write is the AQI itself.
+  for (const b of bindings) if (b.unit === null) tokens.add(`bare:${b.value}`);
 
   const allowance: PlanAllowance = {
     locale,
-    numbers,
-    unitNumbers,
+    tokens,
+    known,
+    names,
     bindings,
     guidanceIds: new Set(guidance.map((g) => g.item.id)),
     swapIds: new Set(swaps.map((s) => s.id)),
