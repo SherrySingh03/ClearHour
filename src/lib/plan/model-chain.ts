@@ -5,14 +5,14 @@
  * assumptions.ts#plan-model-chain, #plan-model-budget
  */
 
-import { classifyModelError, type ModelFailure } from "./model-errors";
+import { classifyModelError, ModelFailure } from "./model-errors";
 
 /**
- * Primary first. Order chosen by the project owner on 2026-11-26 from real plan
- * requests through our schema and validator: the Flash-Lite models passed and
- * answered in 2–5 s. All four are listed as Stable.
+ * Primary first. Order set by the project owner on 2026-11-26 from live runs:
+ * 3.5 Flash-Lite answered in about 1.3 s, while 3.1 Flash-Lite timed out at
+ * 20 s three times. All four are listed as Stable.
  */
-export const MODEL_CHAIN = ["gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3.6-flash"] as const;
+export const MODEL_CHAIN = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.8-flash", "gemini-3.6-flash"] as const;
 
 export interface ChainBudget {
   /** One deadline for the whole plan, shared by every attempt. */
@@ -27,11 +27,25 @@ export const CHAIN_BUDGET: ChainBudget = { totalMs: 50_000, attemptMs: 20_000, m
 
 /**
  * Move on when this model can't serve the request but another might: used-up
- * quota, overload, timeout, or a model that no longer exists. A rejected
- * request or key (400, 401, 403) would fail the same way everywhere.
+ * quota, overload, timeout, a model that no longer exists, or an answer that
+ * isn't JSON. A rejected request or key (400, 401, 403) would fail the same
+ * way everywhere.
  */
 export function triesNextModel(f: ModelFailure): boolean {
-  return f.kind === "model-quota" || f.kind === "model-overloaded" || f.kind === "model-timeout" || f.status === 404;
+  return f.kind === "model-quota" || f.kind === "model-overloaded" || f.kind === "model-timeout" || f.kind === "invalid-json" || f.status === 404;
+}
+
+/**
+ * Only checks that the answer can be read at all. Whether it may be shown is
+ * decided afterwards by the validator, which never retries.
+ */
+function requireJson(text: string): string {
+  try {
+    JSON.parse(text);
+  } catch {
+    throw new ModelFailure("invalid-json", 200);
+  }
+  return text;
 }
 
 export interface Attempt {
@@ -55,7 +69,7 @@ export async function runModelChain(
     if (i > 0 && left < budget.minAttemptMs) break;
     const attemptStarted = now();
     try {
-      const text = await call(model, AbortSignal.timeout(Math.max(1, Math.min(left, budget.attemptMs))));
+      const text = requireJson(await call(model, AbortSignal.timeout(Math.max(1, Math.min(left, budget.attemptMs)))));
       onAttempt({ model, outcome: "ok", status: 200, ms: now() - attemptStarted });
       return text;
     } catch (e) {

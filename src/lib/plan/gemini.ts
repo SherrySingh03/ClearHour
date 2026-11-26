@@ -32,9 +32,8 @@ export function createGeminiModel(apiKey: string, preferred = process.env.GEMINI
             abortSignal,
           },
         });
-        const text = res.text;
-        if (!text) throw new Error("empty response");
-        return text;
+        // An empty answer is malformed too: the chain rejects it and tries the next model.
+        return res.text ?? "";
       },
       // One log line per attempt, codes only: which model, what happened, how long.
       (attempt) => console.warn("[plan:model]", JSON.stringify(attempt)),

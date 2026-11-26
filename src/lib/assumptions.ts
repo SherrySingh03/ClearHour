@@ -175,9 +175,9 @@ export const ASSUMPTIONS: Readonly<Record<AssumptionId, Assumption>> = {
   },
   "plan-model-chain": {
     id: "plan-model-chain",
-    value: "gemini-3.1-flash-lite → 3.5-flash-lite → 3.8-flash → 3.6-flash; next model on quota, overload, timeout or retired model",
+    value: "gemini-3.5-flash-lite → 3.1-flash-lite → 3.8-flash → 3.6-flash; next model on quota, overload, timeout, retired model or an answer that is not JSON",
     rationale:
-      "Free-tier quota is counted per model. Order chosen by the project owner from real plan requests (both Lite models passed the validator in 2–5 s). The two Flash models showed a limit of 20 requests a day in their quota errors; the Lite limits are not published and were not confirmed. A rejected plan is not retried on another model.",
+      "Free-tier quota is counted per model. Order set by the project owner from live runs (3.5 Flash-Lite about 1.3 s; 3.1 Flash-Lite timed out three times). The two Flash models showed a limit of 20 requests a day in their quota errors; the Lite limits are not published and were not confirmed. An unreadable answer moves to the next model; a plan the validator rejects does not.",
     usedIn: ["src/lib/plan/model-chain.ts", "src/lib/plan/gemini.ts"],
   },
   "plan-hour": {

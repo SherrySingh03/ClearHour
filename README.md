@@ -38,8 +38,8 @@ Google Gemini through the official `@google/genai` SDK, tried in this order (`sr
 
 | Order | Model | Free-tier requests per day |
 |---|---|---|
-| 1 | `gemini-3.1-flash-lite` | not published; not confirmed |
-| 2 | `gemini-3.5-flash-lite` | not published; not confirmed |
+| 1 | `gemini-3.5-flash-lite` | not published; not confirmed |
+| 2 | `gemini-3.1-flash-lite` | not published; not confirmed |
 | 3 | `gemini-3.8-flash` | 20 (from its quota error, 2026-11-26) |
 | 4 | `gemini-3.6-flash` | 20 (from its quota error, 2026-11-26) |
 
@@ -51,7 +51,8 @@ The project runs on Gemini's **free tier** (no billing). Quota is counted per mo
 
 - **Explicit.** Opening, reloading or switching language spends nothing. The reading, forecast, best-time box, indoor advice and CO₂ swaps never use Gemini. A plan is generated only on **Get today's plan**.
 - **Hourly shared cache.** One plan per (city, language, answers, Indian clock hour), stored with Next.js `use cache: remote` so it is shared across server instances. Asking again for the same inputs in that hour costs nothing. The latest reading is not part of the key, so a new reading does not bust it; the plan says when it was written and from which reading. The forecast box is evaluated for the same clock hour, so the two agree.
-- **Fallback chain.** On a used-up quota, overload, timeout or retired model, the next model is tried, within one 50 s budget (at most 20 s each). A rejected request or key stops the chain.
+- **Fallback chain.** On a used-up quota, overload, timeout, retired model, or an answer that is empty or not valid JSON, the next model is tried, within one 50 s budget (at most 20 s each). A rejected request or key stops the chain. A readable plan that the validator rejects is **not** retried.
+- **Pre-warming.** `npm run prewarm` requests real plans for sample inputs A, B and C below. They stay cached until the end of that clock hour, and a deployment empties the cache, so it is run after deploying, early in the hour of testing.
 
 What still costs a request: a different city, language, set of answers or hour; a plan the validator rejects (it is discarded and not cached); retrying after a failure; two identical requests arriving at the same instant; and the first request after each deployment (the cache does not carry over).
 
@@ -126,9 +127,9 @@ In each case the grounded text, amounts and sources the app prints beside the no
 
 ### On failure
 
-**Fail closed.** If every model errors or times out, or the answer is invalid JSON or breaks any rule, the **whole** plan is discarded. The route answers `502 {"error":"plan-unavailable"}` and the page says the plan is temporarily unavailable and that the readings and forecast above are live, with a **Try again** button. A partial or unvalidated plan is never rendered, failures are not cached, and upstream error text is never returned.
+**Fail closed.** If no model returns readable JSON, or the plan breaks any rule, the **whole** plan is discarded. The route answers `502 {"error":"plan-unavailable"}` and the page says the plan is temporarily unavailable and that the readings and forecast above are live, with a **Try again** button. A partial or unvalidated plan is never rendered, failures are not cached, and upstream error text is never returned.
 
-The server logs codes only: one `[plan:model]` line per model attempt (`ok`, `model-quota`, `model-overloaded`, `model-timeout`, `model-error`, with the HTTP status and duration) and one `[plan]` line with the final outcome, including the validator's rejection reason. No model text is logged.
+The server logs codes only: one `[plan:model]` line per model attempt (`ok`, `model-quota`, `model-overloaded`, `model-timeout`, `model-error`, `invalid-json`, with the HTTP status and duration) and one `[plan]` line with the final outcome, including the validator's rejection reason. No model text is logged.
 
 ## Sample inputs
 
@@ -231,7 +232,7 @@ These are **Clearhour's own judgment calls, not published standards**. The sourc
 | `distance-rounding` | Nearest 0.5 km | A rough guess needs no more precision; bounds distinct profiles and cached Gemini plans. |
 | `plan-concurrency` | 4 plan generations at once per server instance | Bounds Gemini spend; when full, an immediate generic 502 and a retry button. |
 | `plan-model-budget` | 50 s total; ≤ 20 s per model; no new attempt with < 8 s left | One shared deadline for the whole chain. |
-| `plan-model-chain` | 3.1-flash-lite → 3.5-flash-lite → 3.8-flash → 3.6-flash | Quota is per model. Next model on quota, overload, timeout or retired model. Order from real plan requests; Lite daily limits unconfirmed. |
+| `plan-model-chain` | 3.5-flash-lite → 3.1-flash-lite → 3.8-flash → 3.6-flash | Quota is per model. Next model on quota, overload, timeout, retired model or non-JSON answer; never after a validator rejection. Order from live runs; Lite daily limits unconfirmed. |
 | `plan-hour` | One plan per city, language, answers and clock hour | Repeat requests share one model call. The forecast box is evaluated for the same hour, so it matches the plan. |
 | `saving-lower-bound` | "At least", rounded down to 2 significant figures, with conditions | A floor only if the commuter travels alone (and a petrol car isn't a hybrid). Rounding to nearest could overstate it. |
 | `plan-timeframe-binding` | Each number keeps its kind; measured numbers are quoted with their timeframe, per sentence | The 24-hour AQI needs "24 hours" and no "now"; the latest reading is never "now" or a forecast. Savings and forecast differences are never sent to Gemini, so it can't quote or reverse them; only the UI states them. |
@@ -243,6 +244,7 @@ All UI text comes from `getUiStrings(locale)` (`src/lib/i18n`). JSX contains no 
 
 ## Known limitations
 
+- **What is and isn't machine-checked in a plan.** Numeric claims are structurally validated and bound to their source role: each number must appear in the input as the same kind of thing, and measured values must be quoted with their timeframe. **Qualitative phrasing is constrained by the prompt and shown beside the cited text, but is not machine-checked.** A note can misstate a reason without using any number (seen on 2026-11-26: a note said to wet-mop "to keep dust from settling", which no source says). The cited guidance, amounts and sources printed beside each note come from the app's own data.
 - **Gemini free-tier quota.** The daily allowance is small (20 requests for each Flash model; the Flash-Lite limits are unconfirmed). When it is used up, or models are overloaded, the plan is unavailable until later; everything else on the page works.
 - **Shared OpenAQ limit.** All visitors share one API key. Many *different* cities requested within a minute can exhaust it, and the later ones say monitor readings couldn't be reached for a short while (seen on 2026-11-26 requesting all 26 cities back to back). The grounding cache is in server memory, so on serverless hosting it does little to prevent this. The per-IP rate limit does not stop many visitors adding up. The forecast is unaffected.
 - **Bengaluru's monitor and PM2.5.** On 2026-11-26 the monitor chosen for Bengaluru reported PM10 but no PM2.5, so the page shows no 24-hour air level and says why. It does not fall back to another pollutant.
@@ -263,6 +265,7 @@ npm run dev                       # http://localhost:3000
 npm run probe -- delhi lucknow    # live grounding snapshot per city
 npm run window -- delhi 9         # live best-window verdict (city, departure hour)
 npm run plan-probe -- delhi       # live Gemini plan through the validator, en and hi
+npm run prewarm                   # cache real plans for sample inputs A, B, C on the live site
 ```
 
 Without `OPENAQ_API_KEY` the measured side fails closed and only the labelled forecast is shown. Without `GEMINI_API_KEY` only the plan is unavailable. Deployed on Vercel from `main`.

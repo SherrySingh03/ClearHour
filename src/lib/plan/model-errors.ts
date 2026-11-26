@@ -3,7 +3,7 @@
  * upstream error text is read here and never passed on.
  */
 
-export type ModelFailureKind = "model-quota" | "model-overloaded" | "model-timeout" | "model-error";
+export type ModelFailureKind = "model-quota" | "model-overloaded" | "model-timeout" | "model-error" | "invalid-json";
 
 export class ModelFailure extends Error {
   constructor(

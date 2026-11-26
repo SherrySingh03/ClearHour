@@ -20,7 +20,7 @@ export interface PlanModelRequest {
 /** Returns the model's raw text. Throws on transport failure. */
 export type PlanModel = (req: PlanModelRequest) => Promise<string>;
 
-export type PlanFailure = PlanRejection | ModelFailureKind | "invalid-json";
+export type PlanFailure = PlanRejection | ModelFailureKind;
 
 /** JSON Schema for structured output. Length limits are enforced by the validator. */
 export function planJsonSchema(a: PlanAllowance): Record<string, unknown> {

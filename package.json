@@ -12,7 +12,8 @@
     "probe": "tsx scripts/probe.mts",
     "window": "tsx scripts/window-probe.mts",
     "check:literals": "node scripts/check-jsx-literals.mjs",
-    "plan-probe": "tsx --conditions=react-server scripts/plan-probe.mts"
+    "plan-probe": "tsx --conditions=react-server scripts/plan-probe.mts",
+    "prewarm": "node scripts/prewarm.mjs"
   },
   "dependencies": {
     "@google/genai": "^3.6.1",
