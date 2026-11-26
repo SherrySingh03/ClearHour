@@ -38,7 +38,8 @@ export type AssumptionId =
   | "plan-model-budget"
   | "distance-rounding"
   | "plan-health-vocabulary"
-  | "plan-timeframe-binding";
+  | "plan-timeframe-binding"
+  | "saving-lower-bound";
 
 export const ASSUMPTIONS: Readonly<Record<AssumptionId, Assumption>> = {
   "station-radius": {
@@ -98,7 +99,7 @@ export const ASSUMPTIONS: Readonly<Record<AssumptionId, Assumption>> = {
     id: "vehicle-representative-category",
     value: "Lowest-emitting common category per vehicle type",
     rationale:
-      "Onboarding does not ask engine size. We use the lowest factor in the India GHG Program table for the user's vehicle type (petrol car: Small <800 cc; diesel car: Hatchback <1000 cc; CNG car: Small <800 cc; two-wheeler: Motorcycle <125 cc). Avoided emissions are then a lower bound, never an overstatement.",
+      "Onboarding does not ask engine size. We use the lowest non-hybrid factor in the India GHG Program table for the user's vehicle type (petrol car: Small <800 cc; diesel car: Hatchback <1000 cc; CNG car: Small <800 cc; two-wheeler: Motorcycle <125 cc). For a solo traveller, avoided emissions are then a lower bound; a petrol hybrid (0.103 in the same table) is the exception, so petrol-car figures say so.",
     usedIn: ["src/lib/sourced/emissionFactors.ts"],
   },
   "private-vehicle-solo": {
@@ -179,15 +180,22 @@ export const ASSUMPTIONS: Readonly<Record<AssumptionId, Assumption>> = {
   },
   "plan-health-vocabulary": {
     id: "plan-health-vocabulary",
-    value: "Broad English + Hindi health/medical/safety/exposure word list",
+    value: "One concept table (health, medical, safety, exposure, risk, caution) with words for every UI language",
     rationale: "Any match rejects the whole plan. Deliberately over-inclusive: a false positive costs a retry, a false negative would put an unsourced health claim on screen. The CPCB statement is shown by the UI, never by the plan.",
     usedIn: ["src/lib/plan/validate.ts"],
   },
+  "saving-lower-bound": {
+    id: "saving-lower-bound",
+    value: "Commute savings shown as 'at least', rounded down to 2 significant figures, with their conditions",
+    rationale:
+      "The figure is a floor only for a solo traveller in a vehicle no smaller than the one assumed (and, for petrol cars, not a hybrid, whose source row is lower). Rounding to nearest could push 'at least' above the computed value, so it rounds down. It rests on 2015 factors, which the evidence panel says.",
+    usedIn: ["src/lib/view/describe.ts", "src/components/SwapsPanel.tsx"],
+  },
   "plan-timeframe-binding": {
     id: "plan-timeframe-binding",
-    value: "Per sentence: 24-hour AQI needs '24 hours' and no 'now'; latest reading no 'now'/forecast; forecast numbers need 'forecast'",
+    value: "Per sentence: 24-hour AQI needs '24 hours' and no 'now'; latest reading no 'now'/forecast. Savings and forecast differences are never given to the model",
     rationale:
-      "Units alone let a real number be quoted as the wrong thing (the 24-hour AQI written as 'current air quality'). Each measured or predicted number carries its role, and the sentence quoting it must fit that role. Word lists are broad on purpose: a false positive costs a retry, a false negative misstates a number.",
+      "Units alone let a real number be quoted as the wrong thing (the 24-hour AQI written as 'current air quality'), so each measured number carries its role. Reductions are different: free text can reverse them ('saves 0.4 kg less') in too many ways to check by wording, so the model never receives them and only the UI states them. Word lists are broad on purpose: a false positive costs a retry, a false negative misstates a number.",
     usedIn: ["src/lib/plan/validate.ts", "src/lib/plan/packet.ts"],
   },
   "window-routine-stretch": {

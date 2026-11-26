@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { CITATIONS } from "@/lib/grounding/citations";
 import type { PlanResponse } from "@/lib/plan/types";
 import type { HouseholdProfile } from "@/lib/profile/types";
-import { describeGap, uniqueCitations } from "@/lib/view/describe";
+import { citationLabel, describeGap, uniqueCitations } from "@/lib/view/describe";
 import { useLocale } from "./LocaleContext";
 
 type Load = { status: "loading" } | { status: "failed" } | { status: "ready"; data: PlanResponse };
@@ -38,7 +38,7 @@ export function PlanPanel({ profile }: { profile: HouseholdProfile }) {
   }, [fetchPlan]);
 
   return (
-    <section aria-labelledby="plan-title" className="rounded-2xl border border-ink/20 bg-station px-5 py-5">
+    <section aria-labelledby="plan-title" className="border-t-2 border-ink/15 pt-5">
       <h2 id="plan-title" className="type-condensed text-3xl font-semibold">
         {t.plan.title}
       </h2>
@@ -69,7 +69,7 @@ export function PlanPanel({ profile }: { profile: HouseholdProfile }) {
                       {uniqueCitations(ref.sources.map((s) => s.citation)).map((id) => (
                         <p key={id} className="mt-0.5 text-xs">
                           <a className="underline underline-offset-2" href={CITATIONS[id].url}>
-                            {t.plan.source({ title: CITATIONS[id].publisher })}
+                            {t.plan.source({ title: citationLabel(id) })}
                           </a>
                         </p>
                       ))}
@@ -83,7 +83,7 @@ export function PlanPanel({ profile }: { profile: HouseholdProfile }) {
                       {uniqueCitations(ref.factors.map((x) => x.citation)).map((id) => (
                         <p key={id} className="mt-0.5 text-xs">
                           <a className="underline underline-offset-2" href={CITATIONS[id].url}>
-                            {t.plan.source({ title: CITATIONS[id].title })}
+                            {t.plan.source({ title: citationLabel(id) })}
                           </a>
                         </p>
                       ))}

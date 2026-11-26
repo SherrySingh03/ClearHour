@@ -2,7 +2,7 @@
 
 A GenAI air-quality assistant for Indian households during winter smog. It shows the measured air now (with station and timestamp), today's forecast curve with the cleanest outdoor stretch, indoor measures that help, and lower-emission swaps for the household's routine. Every claim carries its source.
 
-> **Status:** grounding layer, sourced data, best-window logic, English/Hindi UI, onboarding, the main screen and Gemini synthesis are built and tested. The main screen leads with a plain-language verdict; numbers, station details and caveats sit beneath it or one tap away. The Indoor and Swaps sections and deployment come next.
+> **Status:** grounding layer, sourced data, best-window logic, English/Hindi UI, onboarding, the main screen, the Indoor and Swaps sections and Gemini synthesis are built and tested. Plain-language answers lead; numbers, sources and workings sit beneath them or one tap away. Deployment comes next.
 
 ## Languages
 
@@ -60,7 +60,7 @@ These are **Clearhour's own judgment calls, not published standards**. The sourc
 | `snapshot-cache` | 10 min (outages: seconds) | CPCB updates every 15–60 min. Outages are retried quickly. |
 | `naqi-display-rounding` | Nearest integer | CPCB bulletins report whole numbers. |
 | `naqi-cap-500` | Capped at 500 | The calculator has no upper limit; the report defines the scale as 0–500. |
-| `vehicle-representative-category` | Lowest-emitting common category | Onboarding doesn't ask engine size, so avoided emissions are a lower bound. |
+| `vehicle-representative-category` | Lowest-emitting common (non-hybrid) category | Onboarding doesn't ask engine size. For a solo traveller the avoided emissions are a lower bound, except for petrol hybrids (0.103 in the same table), which the figure says. |
 | `private-vehicle-solo` | One person per car/two-wheeler trip | Factors are per vehicle-km. |
 | `commute-round-trip` | 2 × one-way, per working day | Onboarding asks for one-way distance. |
 | `walk-cycle-max-distance` | ≤ 3 km one way | Suggested only where plausibly practical. |
@@ -74,8 +74,9 @@ These are **Clearhour's own judgment calls, not published standards**. The sourc
 | `plan-concurrency` | 4 plan generations at once per server instance | Bounds Gemini spend; when full, an immediate generic 502 and a retry button. |
 | `plan-model-budget` | 50 s total; fallback only on 5xx/timeout with ≥ 15 s left | One shared deadline; never fall back on quota errors (429). |
 | `plan-time-bucket` | 15 minutes | Plan cache key granularity. The best window depends on time of day; this bounds Gemini calls. |
-| `plan-timeframe-binding` | Each measured/predicted number must be quoted with its timeframe, per sentence | The 24-hour AQI needs "24 hours" and no "now"; the latest reading is never "now" or a forecast; forecast numbers are called a forecast. Units alone let a real number be quoted as the wrong thing. |
-| `plan-health-vocabulary` | Broad English + Hindi health/medical/safety/exposure word list | Any match rejects the whole plan. A false positive costs a retry; a false negative would show an unsourced health claim. |
+| `saving-lower-bound` | "At least", rounded down to 2 significant figures, with conditions | A floor only if the commuter travels alone (and a petrol car isn't a hybrid). Rounding to nearest could overstate it. |
+| `plan-timeframe-binding` | Each measured number must be quoted with its timeframe, per sentence | The 24-hour AQI needs "24 hours" and no "now"; the latest reading is never "now" or a forecast. Savings and forecast differences are never sent to Gemini, so it can't quote or reverse them; only the UI states them. |
+| `plan-health-vocabulary` | One concept table (health, medical, safety, exposure, risk, caution) with words for every UI language | Any match rejects the whole plan. A new language fails to compile, and fails tests, until every concept has words for it. |
 
 ## Running
 
@@ -98,8 +99,8 @@ Without `OPENAQ_API_KEY` the measured side fails closed and only the labelled fo
 | **Model** | Google Gemini, `gemini-3.8-flash` (listed as Stable on Google's models page, checked 2026-11-25), via the official `@google/genai` SDK. Override with `GEMINI_MODEL`. |
 | **Where it sits** | Server only (`src/lib/plan/gemini.ts`, imported behind `server-only`). Called from `POST /api/plan` after the grounding snapshot is built. The key never reaches the browser. |
 | **Its one job** | Synthesis and explanation: choose which already-grounded items matter today for this household, order them, and explain them in plain English or Hindi. |
-| **What it receives** | A packet (`src/lib/plan/packet.ts`): the measured reading or its gap code, the forecast's best-window verdict (already computed), the household profile, the selected sourced guidance and the computed swaps. Every number in it is a display string the page itself shows. It does **not** receive CPCB health statements. |
-| **Models and fallback** | Primary `gemini-3.8-flash`. If it errors server-side (5xx, including 503 overload) or times out, `gemini-3.6-flash`, also listed as Stable, within one shared 50 s budget. No fallback on quota errors (429). Both go through the same validator. A live run on 2026-11-25 passed 6/6 plans (3 cities × English/Hindi): `npm run plan-probe -- delhi lucknow thiruvananthapuram`. |
+| **What it receives** | A packet (`src/lib/plan/packet.ts`): the measured reading or its gap code, the forecast's best-window verdict (already computed), the household profile, the selected sourced guidance and the names of the computed swaps. Every number in it is a display string the page itself shows. It does **not** receive CPCB health statements, saving amounts or forecast differences. |
+| **Models and fallback** | Primary `gemini-3.8-flash`. If it errors server-side (5xx, including 503 overload) or times out, `gemini-3.6-flash`, also listed as Stable, within one shared 50 s budget. No fallback on quota errors (429). Both go through the same validator. A live run on 2026-11-25 passed 6/6 plans (3 cities × English/Hindi): `npm run plan-probe -- delhi lucknow thiruvananthapuram`. The validator has been tightened since. On 2026-11-26 the one English plan Gemini returned passed; the other attempts failed upstream (503, timeouts, then quota 429), so Hindi is not yet re-verified live. |
 | **What it returns** | Structured JSON only (`responseJsonSchema`): a headline, 1–5 steps that each reference an input id (`window`, a guidance id or a swap id) with a short note, and the list of acknowledged data gaps. |
 | **What it may never produce** | A pollution number, an emission factor, a health threshold, a health or medical claim, a safety or exposure claim, or any number not already in its input. |
 | **How that is enforced** | `src/lib/plan/validate.ts` checks every plan before it is shown: schema and lengths, ids exist and aren't repeated, no window step without a forecast, exactly the input's gaps acknowledged, no links, no health vocabulary (English and Hindi), no spelled-out quantities, every numeral present in the input (with its own unit), every measured or predicted number quoted with its timeframe (the 24-hour AQI as 24-hour and never "now"; a forecast as a forecast), right language. **Any failure rejects the whole plan.** |

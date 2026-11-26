@@ -29,7 +29,7 @@ function stretchesOf(r: WindowResult): { best: Stretch | null; routine: Stretch 
 function Shell({ children }: { children: ReactNode }) {
   const { t } = useLocale();
   return (
-    <section aria-labelledby="window-title" className="haze rounded-2xl border-2 border-dashed border-model/50 px-5 pt-5 pb-4">
+    <section aria-labelledby="window-title" className="haze rounded-2xl border-2 border-dashed border-model/50 px-5 pt-3 pb-4">
       <p className="flex items-center gap-2 text-sm font-medium text-model">
         <ForecastMark />
         {t.window.badge}
@@ -71,9 +71,9 @@ export function WindowPanel({ forecast, now, departureHour }: { forecast: Ground
         {view.headline}
       </h2>
       {view.showCaveat && <p className="mt-2 text-sm font-medium text-model">{t.window.approxNote}</p>}
-      {view.details.length > 0 && (
+      {(view.drop !== null || view.details.length > 0) && (
         <ul className="mt-3 space-y-1 text-ink/85">
-          {view.details.map((d) => (
+          {[...(view.drop === null ? [] : [view.drop]), ...view.details].map((d) => (
             <li key={d}>{d}</li>
           ))}
         </ul>

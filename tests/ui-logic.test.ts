@@ -3,7 +3,8 @@ import { getFormatters, getUiStrings, LOCALES } from "@/lib/i18n";
 import { makeForecastPoint, type ForecastSeries } from "@/lib/grounding/types";
 import { bestWindow } from "@/lib/plan/window";
 import { parseProfile } from "@/lib/profile/storage";
-import { describeAge, describeWindow, uniqueCitations } from "@/lib/view/describe";
+import { swapsFor } from "@/lib/sourced/swaps";
+import { describeAge, describeSaving, describeWindow, floorTo2Significant, uniqueCitations } from "@/lib/view/describe";
 
 const EARLY = new Date("2026-11-24T22:30:00Z"); // 04:00 IST
 
@@ -60,7 +61,7 @@ describe.each(LOCALES)("window sentences (%s)", (locale) => {
   });
 
   it("no forecast: an explicit message, no caveat (no window is presented)", () => {
-    expect(describeWindow({ verdict: "no-forecast" }, t, f)).toEqual({ headline: t.window.unavailable, details: [], showCaveat: false });
+    expect(describeWindow({ verdict: "no-forecast" }, t, f)).toEqual({ headline: t.window.unavailable, drop: null, details: [], showCaveat: false });
   });
 
   it("late evening (forecast present, no full stretch left): says it's too late today, never 'no forecast'", () => {
@@ -76,9 +77,9 @@ describe.each(LOCALES)("window sentences (%s)", (locale) => {
 
   it("drop lines name what they are compared with: the usual departure, or a typical stretch", () => {
     const vsRoutine = describeWindow(bestWindow({ forecast: series((h) => (h < 8 ? 290 : 400)), now: EARLY, departureHour: 9 }), t, f);
-    expect(vsRoutine.details[0]).toBe(t.window.dropVsRoutine({ drop: f.number(110), pct: f.number(27.5) }));
+    expect(vsRoutine.drop).toBe(t.window.dropVsRoutine({ drop: f.number(110), pct: f.number(27.5) }));
     const vsTypical = describeWindow(bestWindow({ forecast: series((h) => (h >= 6 && h < 9 ? 70 : 200)), now: EARLY }), t, f);
-    expect(vsTypical.details[0]).toBe(t.window.dropVsTypical({ drop: f.number(130), pct: f.number(65) }));
+    expect(vsTypical.drop).toBe(t.window.dropVsTypical({ drop: f.number(130), pct: f.number(65) }));
   });
 
   it("every UI string is non-empty", () => {
@@ -141,5 +142,49 @@ describe("plan source links", () => {
       "mohfw-air-advisory-2025",
       "ighgp-road-2015",
     ]);
+  });
+});
+
+describe.each(LOCALES)("swap figures (%s)", (locale) => {
+  const t = getUiStrings(locale);
+  const f = getFormatters(locale);
+  const profileWith = (mode: "two-wheeler" | "car-petrol" | "car-diesel", oneWayKm: number) => ({
+    cityId: "delhi",
+    commute: { mode, oneWayKm },
+    cookingFuel: "lpg" as const,
+    hasChildrenOrElderly: false,
+    hasAirPurifier: false,
+  });
+  const bus = (mode: "two-wheeler" | "car-petrol" | "car-diesel", km: number) => swapsFor(profileWith(mode, km)).swaps.find((s) => s.id === `commute:${mode}->bus`)!;
+
+  it("'at least' never exceeds the computed saving (0.268 kg shows as 0.26, not 0.3)", () => {
+    const swap = bus("two-wheeler", 8);
+    expect(swap.saving.value).toBeCloseTo(0.268, 3);
+    expect(describeSaving(swap, t, f)).toBe(t.swaps.atLeastKgPerDay({ kg: "0.26" }));
+  });
+
+  it("petrol cars carry the not-a-hybrid condition; other vehicles don't", () => {
+    expect(describeSaving(bus("car-petrol", 12), t, f)).toBe(t.swaps.atLeastKgPerDayPetrolCar({ kg: "2.3" }));
+    expect(describeSaving(bus("car-diesel", 12), t, f)).toBe(t.swaps.atLeastKgPerDay({ kg: "2.3" }));
+  });
+
+  it("the stove figure states its assumption", () => {
+    const png = swapsFor(profileWith("car-diesel", 1)).swaps.find((s) => s.id === "cooking:lpg->png")!;
+    expect(describeSaving(png, t, f)).toBe(t.swaps.percentLess({ pct: "11" }));
+  });
+});
+
+describe("rounding down", () => {
+  it.each([
+    [0.2678, 0.26],
+    [2.300136, 2.3],
+    [0.0167, 0.016],
+    [0.3, 0.3],
+    [12.99, 12],
+    [123.4, 120],
+    [0, 0],
+  ])("%d → %d", (x, want) => {
+    expect(floorTo2Significant(x)).toBe(want);
+    expect(floorTo2Significant(x)).toBeLessThanOrEqual(x);
   });
 });

@@ -8,20 +8,22 @@
  *  - window: no window step when no forecast window was given
  *  - gaps: exactly the input's missing-data codes are acknowledged
  *  - links: no URLs
- *  - health: no health, medical or exposure claims (the UI shows CPCB's
- *    verbatim statement; the plan adds none)
+ *  - health: no health, medical, safety, exposure or caution wording, in any
+ *    UI language (lexicon.ts); the UI shows CPCB's verbatim statement
  *  - numbers: no spelled-out quantities; no digits from other scripts or
  *    numeric symbols; every numeral appears in the input; and a number next
  *    to a unit (µg/m³, kg, %) appeared with that same unit in the input
  *  - timeframes: a sentence quoting a measured or predicted number says what
  *    it is (24-hour AQI as 24-hour and never "now"; the latest reading never
- *    "now" or a forecast; a forecast number as a forecast)
+ *    "now" or a forecast). Savings and forecast differences are never given
+ *    to the model, so it cannot quote or reverse them: only the UI shows them
  *  - language: written in the requested language
  */
 
 import { z } from "zod";
 import { missing, ok, type Grounded } from "../grounding/types";
-import { containsNumberWord, extractNumbers, extractUnitNumbers, hasUnsupportedNumerals, normalise, numberOccurrences, sentences } from "./numbers";
+import { containsNumberWord, healthConcept, mentionsForecast, mentionsLast24Hours, mentionsNow } from "./lexicon";
+import { extractNumbers, extractUnitNumbers, hasUnsupportedNumerals, normalise, numberOccurrences, sentences } from "./numbers";
 import type { NumberBinding, NumberRole, Plan, PlanAllowance } from "./types";
 
 export const LIMITS = { headline: 160, note: 240, maxSteps: 5 } as const;
@@ -48,32 +50,15 @@ const PlanSchema = z.object({
   acknowledgedGaps: z.array(z.string().max(80)).max(10),
 });
 
-/**
- * Health / medical / exposure vocabulary. Matching any of it rejects the plan.
- * Deliberately broad: a false positive costs a retry; a false negative would
- * put an unsourced health claim on screen.
- */
-const HEALTH_EN =
-  /\b(health\w*|healthy|unhealthy|asthma\w*|lungs?|heart|cardi\w*|breath\w*|respirat\w*|cough\w*|wheez\w*|diseases?|illness\w*|ill|sick\w*|symptoms?|cancer\w*|deaths?|die|dying|mortality|medic\w*|doctors?|hospital\w*|inhaler\w*|diagnos\w*|treat(ment|ed|ing)?|cure\w*|immun\w*|pregnan\w*|exposure\w*|exposed|safe|safer|safely|unsafe|harmful|toxic\w*|poison\w*|risks?|risky|protects? your)\b/i;
-const HEALTH_HI =
-  /(स्वास्थ्य|सेहत|स्वस्थ|अस्वस्थ|दमा|अस्थमा|फेफड़|फेफड|हृदय|दिल(?!्ली)|सांस|साँस|श्वास|खांसी|खाँसी|बीमार|रोग|लक्षण|कैंसर|मौत|मृत्यु|डॉक्टर|अस्पताल|दवा|इलाज|उपचार|गर्भ|संपर्क|सुरक्षित|असुरक्षित|हानिकारक|ज़हरीला|जहरीला|खतरा|ख़तरा|जोखिम)/;
-
 const LINK = /(https?:\/\/|www\.)/i;
 
 /**
- * Timeframe words. A measured value is never "now": the latest reading is
- * hours old and the AQI is a 24-hour average. Broad on purpose, like the
- * health list: a false positive costs a retry.
+ * A measured value is never "now": the latest reading is hours old and the AQI
+ * is a 24-hour average. Neither may be quoted as a forecast.
  */
-const H24 = /24\s*-?\s*(hours?|hrs?|घंटे|घंटा|घंटों)/i;
-const NOW = /\b(now|current\w*|presently|at the moment|this moment)\b|अभी|इस समय|इस वक़्त|इस वक्त|वर्तमान|फ़िलहाल|फिलहाल|मौजूदा/i;
-const FORECAST = /\b(forecast\w*|predict\w*|expect\w*|model\w*|projected)\b|पूर्वानुमान|अनुमान|संभावना/i;
-const MEASURED = /\b(reading\w*|measured|measurement\w*|monitor\w*|station\w*|recorded)\b|रीडिंग|मापा|मापी|मापे|मॉनिटर|स्टेशन|दर्ज/i;
-
 const ROLE_OK: Readonly<Record<NumberRole, (sentence: string) => boolean>> = {
-  "aqi-24h": (x) => H24.test(x) && !NOW.test(x) && !FORECAST.test(x),
-  "latest-reading": (x) => !NOW.test(x) && !FORECAST.test(x),
-  forecast: (x) => FORECAST.test(x) && !MEASURED.test(x),
+  "aqi-24h": (x) => mentionsLast24Hours(x) && !mentionsNow(x) && !mentionsForecast(x),
+  "latest-reading": (x) => !mentionsNow(x) && !mentionsForecast(x),
 };
 
 /**
@@ -124,7 +109,7 @@ export function validatePlan(raw: unknown, a: PlanAllowance): Grounded<Plan, Pla
   const texts = [p.headline, ...p.steps.map((s) => s.note)];
   for (const text of texts) {
     if (LINK.test(text)) return missing("link");
-    if (HEALTH_EN.test(text) || HEALTH_HI.test(text)) return missing("health-claim", text);
+    if (healthConcept(text) !== null) return missing("health-claim", text);
     if (containsNumberWord(text)) return missing("number-word", text);
     if (hasUnsupportedNumerals(text)) return missing("unknown-number", "unsupported-numerals");
     const stray = extractNumbers(text).find((n) => !a.numbers.has(n));

@@ -10,7 +10,7 @@
 
 import type { CitationId } from "../grounding/citations";
 import type { Locale } from "../i18n/locales";
-import type { NaqiCategory } from "../grounding/types";
+import type { GroundingSnapshot, NaqiCategory } from "../grounding/types";
 import { categoryRank } from "../grounding/aqi/cpcb";
 import type { CookingFuel, HouseholdProfile } from "../profile/types";
 
@@ -138,8 +138,8 @@ export const GUIDANCE: readonly GuidanceItem[] = [
     id: "wet-mopping",
     trigger: "always",
     text: {
-      en: "Wet-mop floors instead of sweeping. If you vacuum, use a vacuum cleaner with a HEPA filter.",
-      hi: "झाड़ू लगाने के बजाय गीला पोंछा लगाएँ। वैक्यूम करें तो HEPA फ़िल्टर वाला वैक्यूम क्लीनर इस्तेमाल करें।",
+      en: "Wet-mop floors instead of sweeping or vacuuming. If you do use a vacuum cleaner, use one with a HEPA filter.",
+      hi: "झाड़ू लगाने या वैक्यूम करने के बजाय गीला पोंछा लगाएँ। वैक्यूम क्लीनर इस्तेमाल करें तो HEPA फ़िल्टर वाला लें।",
     },
     sources: [
       {
@@ -155,8 +155,8 @@ export const GUIDANCE: readonly GuidanceItem[] = [
     trigger: "poor-or-worse",
     requires: { purifier: true },
     text: {
-      en: "On poor-to-severe days, run your air purifier. Follow the manufacturer's instructions and clean or replace filters as directed.",
-      hi: "खराब से गंभीर AQI वाले दिनों में अपना एयर प्यूरीफ़ायर चलाएँ। निर्माता के निर्देशों का पालन करें और फ़िल्टर बताए अनुसार साफ़ करें या बदलें।",
+      en: "On poor-to-severe days, the health ministry says an air purifier may help. If you use one, follow the maker's instructions and clean or replace filters as directed.",
+      hi: "स्वास्थ्य मंत्रालय के अनुसार खराब से गंभीर AQI वाले दिनों में एयर प्यूरीफ़ायर मददगार हो सकता है। इस्तेमाल करें तो निर्माता के निर्देश मानें और फ़िल्टर बताए अनुसार साफ़ करें या बदलें।",
     },
     sources: [
       {
@@ -259,6 +259,14 @@ export type CategorySignal =
   | { readonly basis: "measured-24h"; readonly category: NaqiCategory }
   | { readonly basis: "forecast-indicative"; readonly category: NaqiCategory }
   | { readonly basis: "unknown" };
+
+/** Today's signal comes from the measured 24-hour sub-index only; otherwise unknown. */
+export function categorySignal(snapshot: GroundingSnapshot): CategorySignal {
+  if (snapshot.measured.ok && snapshot.measured.data.naqi24h.pm25.ok) {
+    return { basis: "measured-24h", category: snapshot.measured.data.naqi24h.pm25.data.category };
+  }
+  return { basis: "unknown" };
+}
 
 export interface SelectedGuidance {
   readonly item: GuidanceItem;

@@ -11,10 +11,20 @@ const withStep = (i: number, note: string) => ({ ...validPlan, steps: validPlan.
 describe("plan packet", () => {
   it("collects every number the page shows, and nothing for the model to invent", () => {
     const { allowance, packet } = buildPlanInput(input);
-    for (const n of ["45", "220", "2.6", "12", "4", "5", "8", "30", "11", "2.3", "24"]) expect(allowance.numbers.has(n), n).toBe(true);
+    for (const n of ["45", "220", "2.6", "12", "5", "8", "30", "24"]) expect(allowance.numbers.has(n), n).toBe(true);
     expect(allowance.numbers.has("37")).toBe(false);
     expect(allowance.gaps).toEqual([]);
     expect(JSON.stringify(packet)).not.toContain("Breathing discomfort"); // no health statement is given to the model
+  });
+
+  it("never gives the model a saving or a forecast difference to quote", () => {
+    const { allowance, packet } = buildPlanInput(input);
+    const sent = JSON.stringify(packet);
+    expect(sent).not.toMatch(/kg|%|saving|less CO/i);
+    expect(allowance.unitNumbers.kg.size).toBe(0);
+    expect(allowance.unitNumbers.pct.size).toBe(0);
+    // The only concentration it may quote is the latest reading.
+    expect([...allowance.unitNumbers.ugm3]).toEqual(["45"]);
   });
 
   it("records missing grounding data as gaps the plan must acknowledge", () => {
@@ -50,9 +60,18 @@ describe("validator rejects the WHOLE plan", () => {
     expect(r).toEqual({ ok: false, reason: "unknown-number", detail: "37" });
   });
 
-  it("a re-rounded number fails too (2.3 shown → 2.4 written)", async () => {
-    const r = await synthesizePlan(input, fake(withStep(2, "The bus avoids about 2.4 kg of CO₂ a day.")));
-    expect(r).toEqual({ ok: false, reason: "unknown-number", detail: "2.4" });
+  it("a re-rounded number fails too (45 shown → 46 written)", async () => {
+    const r = await synthesizePlan(input, fake(withStep(1, "The latest reading was 46 µg/m³.")));
+    expect(r).toEqual({ ok: false, reason: "unknown-number", detail: "46" });
+  });
+
+  it.each([
+    "Taking the bus saves 0.4 kg less CO₂ per working day.",
+    "Taking the bus avoids about 2.3 kg of CO₂.",
+    "Piped gas gives 11% less CO₂.",
+    "The forecast shows 69 µg/m³ more fine dust later.",
+  ])("rejects any amount of saving or difference, right or reversed: %s", async (note) => {
+    expect(await synthesizePlan(input, fake(withStep(2, note)))).toMatchObject({ ok: false, reason: "unknown-number" });
   });
 
   it("an injected health claim fails the whole plan (English)", async () => {
@@ -150,23 +169,18 @@ describe("number gate cannot be bypassed", () => {
 
   it("still accepts numbers used with their own unit", () => {
     expect(check("The latest reading was 45 µg/m³ at the station.").ok).toBe(true);
-    expect(check("Taking the bus avoids about 2.3 kg of CO₂ on a working day.").ok).toBe(true);
   });
 });
 
 describe("numbers are bound to what they are (timeframe), not just to a unit", () => {
   const { allowance } = buildPlanInput(input);
   const check = (note: string) => validatePlan(withStep(2, note), allowance);
-  const forecast = allowance.bindings.filter((b) => b.role === "forecast");
 
-  it("records the role of each measured and predicted number", () => {
-    expect(allowance.bindings).toEqual(
-      expect.arrayContaining([
-        { value: "220", unit: null, role: "aqi-24h" },
-        { value: "45", unit: "ugm3", role: "latest-reading" },
-      ]),
-    );
-    expect(forecast.map((b) => b.unit).sort()).toEqual(["pct", "ugm3"]);
+  it("records the role of each measured number", () => {
+    expect(allowance.bindings).toEqual([
+      { value: "45", unit: "ugm3", role: "latest-reading" },
+      { value: "220", unit: null, role: "aqi-24h" },
+    ]);
   });
 
   it("rejects the 24-hour AQI described as current air quality", () => {
@@ -190,13 +204,6 @@ describe("numbers are bound to what they are (timeframe), not just to a unit", (
     expect(check("The forecast says 45 µg/m³ in the morning.")).toMatchObject({ ok: false, reason: "number-role" });
   });
 
-  it("rejects a forecast number not called a forecast, or mixed with a reading", () => {
-    const drop = forecast.find((b) => b.unit === "ugm3")!.value;
-    expect(check(`Leaving early means ${drop} µg/m³ less fine dust.`)).toMatchObject({ ok: false, reason: "number-role" });
-    expect(check(`The station reading and forecast differ by ${drop} µg/m³.`)).toMatchObject({ ok: false, reason: "number-role" });
-    expect(check(`The forecast shows about ${drop} µg/m³ less fine dust early on.`).ok).toBe(true);
-  });
-
   it("Hindi: rejects अभी / वर्तमान with the AQI, accepts 24 घंटे", () => {
     const hi = buildPlanInput({ ...input, locale: "hi" }).allowance;
     const hiCheck = (note: string) => validatePlan({ ...withStep(2, note), headline: "दिल्ली में आज सुबह जल्दी निकलें।", steps: [{ kind: "swap", refId: "commute:car-petrol->bus", note }] }, hi);
@@ -206,6 +213,6 @@ describe("numbers are bound to what they are (timeframe), not just to a unit", (
   });
 
   it("clock times and other units never trip the binding", () => {
-    expect(check("Leave at 4:45 am; the bus avoids about 2.3 kg of CO₂ on a working day.").ok).toBe(true);
+    expect(check("Leave at 4:45 am and take the bus on your 12 km commute.").ok).toBe(true);
   });
 });

@@ -5,10 +5,12 @@ import { CITATIONS } from "@/lib/grounding/citations";
 import { findCity } from "@/lib/grounding/cities";
 import type { GroundingSnapshot } from "@/lib/grounding/types";
 import type { HouseholdProfile } from "@/lib/profile/types";
+import { IndoorPanel } from "./IndoorPanel";
 import { LanguageSwitch } from "./LanguageSwitch";
 import { useLocale } from "./LocaleContext";
 import { MeasuredMark, MeasuredPanel } from "./MeasuredPanel";
 import { PlanPanel } from "./PlanPanel";
+import { SwapsPanel } from "./SwapsPanel";
 import { ForecastMark, WindowPanel } from "./WindowPanel";
 
 type Load = { status: "loading" } | { status: "error" } | { status: "ready"; snapshot: GroundingSnapshot; now: Date };
@@ -53,7 +55,7 @@ export function Home({ profile, onEdit }: { profile: HouseholdProfile; onEdit: (
       </header>
 
       {/* The measured/forecast split in one plain line; the marks match the boxes below. */}
-      <p className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted">
+      <p className="mt-3 flex flex-wrap gap-x-5 gap-y-0.5 text-sm leading-snug text-muted">
         <span className="flex items-center gap-2">
           <MeasuredMark />
           {t.key.measured}
@@ -74,10 +76,12 @@ export function Home({ profile, onEdit }: { profile: HouseholdProfile; onEdit: (
         </div>
       )}
       {load.status === "ready" && (
-        <div className="mt-4 space-y-5">
+        <div className="mt-3 space-y-3">
           <MeasuredPanel snapshot={load.snapshot} now={load.now} city={city?.names[locale] ?? ""} />
           <WindowPanel forecast={load.snapshot.forecast} now={load.now} departureHour={profile.commute.mode === "none" ? undefined : profile.commute.departureHour} />
           <PlanPanel profile={profile} />
+          <IndoorPanel snapshot={load.snapshot} profile={profile} />
+          <SwapsPanel profile={profile} />
         </div>
       )}
 

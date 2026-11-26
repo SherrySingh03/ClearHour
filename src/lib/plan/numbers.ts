@@ -110,12 +110,3 @@ export function sentences(text: string): string[] {
     .map((x) => x.trim())
     .filter(Boolean);
 }
-
-/** Spelled-out quantities. Hindi list avoids words that double as verbs (e.g. "दो" = "give"). */
-const NUMBER_WORDS_EN =
-  /\b(two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|dozen|half|twice|double|triple|percent|per cent)\b/i;
-const NUMBER_WORDS_HI = /(तीन|चार|पाँच|पांच|छह|सात|आठ|नौ|दस|बीस|तीस|चालीस|पचास|सौ|हज़ार|हजार|आधा|आधे|दोगुना|गुना|प्रतिशत|फ़ीसदी|फीसदी)/;
-
-export function containsNumberWord(text: string): boolean {
-  return NUMBER_WORDS_EN.test(text) || NUMBER_WORDS_HI.test(text);
-}

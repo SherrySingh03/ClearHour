@@ -71,7 +71,7 @@ export const validPlan = {
   steps: [
     { kind: "window", refId: "window", note: "The forecast shows 5:30 – 8:30 am as cleaner than 8:30 – 11:30 am, so leave earlier if you can." },
     { kind: "guidance", refId: "ventilate-midday", note: "Today is a Poor day at the nearest station, so keep windows shut in the morning." },
-    { kind: "swap", refId: "commute:car-petrol->bus", note: "Taking the bus would avoid about 2.3 kg of CO₂ on a working day." },
+    { kind: "swap", refId: "commute:car-petrol->bus", note: "Taking the bus on your commute lowers your CO₂ on a working day." },
   ],
   acknowledgedGaps: [],
 };

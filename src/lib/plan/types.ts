@@ -20,13 +20,13 @@ export interface Plan {
   readonly acknowledgedGaps: readonly GapCode[];
 }
 
-export type NumberRole = "aqi-24h" | "latest-reading" | "forecast";
+export type NumberRole = "aqi-24h" | "latest-reading";
 
 export interface NumberBinding {
   /** Normalised, as `extractNumbers` returns it. */
   readonly value: string;
   /** The unit it was shown with, or null for a unitless index. */
-  readonly unit: "ugm3" | "pct" | null;
+  readonly unit: "ugm3" | null;
   readonly role: NumberRole;
 }
 
@@ -38,9 +38,9 @@ export interface PlanAllowance {
   /** Numbers that appeared directly before each unit. A number next to a unit must come from the same unit. */
   readonly unitNumbers: Readonly<Record<"ugm3" | "kg" | "pct", ReadonlySet<string>>>;
   /**
-   * What each measured or predicted number IS. A sentence quoting one must say
-   * so: the 24-hour AQI as 24-hour, never "now"; the latest reading never as
-   * "now" or a prediction; a forecast number as a forecast.
+   * What each measured number IS. A sentence quoting one must say so: the
+   * 24-hour AQI as 24-hour, never "now"; the latest reading never as "now" or
+   * a prediction.
    */
   readonly bindings: readonly NumberBinding[];
   readonly guidanceIds: ReadonlySet<string>;

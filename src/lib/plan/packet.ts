@@ -13,40 +13,18 @@ import { findCity } from "../grounding/cities";
 import { EMISSION_FACTORS } from "../sourced/emissionFactors";
 import type { GroundingSnapshot } from "../grounding/types";
 import type { HouseholdProfile } from "../profile/types";
-import { selectGuidance, type CategorySignal } from "../sourced/guidance";
-import { swapsFor, type Swap, type SwapId } from "../sourced/swaps";
+import { categorySignal, selectGuidance } from "../sourced/guidance";
+import { swapsFor } from "../sourced/swaps";
 import { bestWindow } from "./window";
-import { describeAge, describeWindow } from "../view/describe";
+import { describeAge, describeSaving, describeWindow, swapTarget } from "../view/describe";
 import { extractNumbers, extractUnitNumbers } from "./numbers";
 import type { GapCode, NumberBinding, PlanAllowance, RefDetail } from "./types";
-import type { Formatters, UiStrings } from "../i18n";
 
 export interface PlanInput {
   readonly snapshot: GroundingSnapshot;
   readonly profile: HouseholdProfile;
   readonly locale: Locale;
   readonly now: Date;
-}
-
-export type SwapTarget = keyof UiStrings["swaps"]["targets"];
-
-export function swapTarget(id: SwapId): SwapTarget {
-  if (id === "cooking:lpg->png") return "png";
-  if (id === "cooking:kerosene->lpg" || id === "cooking:biomass->lpg") return "lpg";
-  return id.split("->")[1] as SwapTarget;
-}
-
-export function describeSaving(s: Swap, t: UiStrings, f: Formatters): string {
-  return s.saving.quantity === "kgCO2-per-working-day"
-    ? t.swaps.kgPerDay({ kg: f.number(s.saving.value, 1) })
-    : t.swaps.percentLess({ pct: f.number(s.saving.value) });
-}
-
-function categorySignal(snapshot: GroundingSnapshot): CategorySignal {
-  if (snapshot.measured.ok && snapshot.measured.data.naqi24h.pm25.ok) {
-    return { basis: "measured-24h", category: snapshot.measured.data.naqi24h.pm25.data.category };
-  }
-  return { basis: "unknown" };
 }
 
 export function buildPlanInput({ snapshot, profile, locale, now }: PlanInput) {
@@ -96,12 +74,6 @@ export function buildPlanInput({ snapshot, profile, locale, now }: PlanInput) {
     const result = bestWindow({ forecast: snapshot.forecast.data, now, ...(departureHour === undefined ? {} : { departureHour }) });
     const view = describeWindow(result, t, f);
     windowAvailable = view.showCaveat;
-    // Forecast drops (µg/m³ and %) are predictions, and must be quoted as such.
-    for (const line of view.details) {
-      const u = extractUnitNumbers(line);
-      u.ugm3.forEach((value) => bindings.push({ value, unit: "ugm3", role: "forecast" }));
-      u.pct.forEach((value) => bindings.push({ value, unit: "pct", role: "forecast" }));
-    }
     forecast = { available: true, isModelPrediction: true, verdict: result.verdict, statement: view.headline, details: view.details, caveat: windowAvailable ? t.window.caveat : null };
   }
 
@@ -116,7 +88,9 @@ export function buildPlanInput({ snapshot, profile, locale, now }: PlanInput) {
     hasAirPurifier: profile.hasAirPurifier,
   };
 
-  // Sourced guidance and computed swaps
+  // Sourced guidance and computed swaps. Amounts (savings, forecast differences)
+  // are deliberately left out of the packet: the UI shows them with their
+  // conditions, and a number the model never saw fails the unknown-number check.
   const guidance = selectGuidance(profile, categorySignal(snapshot));
   const { swaps } = swapsFor(profile);
   const refs: Record<string, RefDetail> = {};
@@ -148,7 +122,7 @@ export function buildPlanInput({ snapshot, profile, locale, now }: PlanInput) {
       text: g.item.text[locale],
       appliesBecause: g.triggeredBy === null ? "every-day" : g.triggeredBy.basis === "unknown" ? "on-poor-days-category-unknown" : `today-${g.triggeredBy.basis}`,
     })),
-    swaps: swaps.map((s) => ({ id: s.id, action: t.swaps.targets[swapTarget(s.id)], saving: describeSaving(s, t, f), onlyIfAvailable: s.conditional })),
+    swaps: swaps.map((s) => ({ id: s.id, action: t.swaps.targets[swapTarget(s.id)], lowersCO2: true, onlyIfAvailable: s.conditional })),
     gaps,
   };
 

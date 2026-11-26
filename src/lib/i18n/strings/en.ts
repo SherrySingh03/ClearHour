@@ -9,7 +9,10 @@
  * it is compared against, and where it was measured from.
  */
 
+import type { AssumptionId } from "../../assumptions";
 import type { CommuteMode, CookingFuel } from "../../profile/types";
+import type { FactorId, FactorUnit } from "../../sourced/emissionFactors";
+import type { WithheldReason } from "../../sourced/swaps";
 import type {
   ForecastMissingReason,
   MeasuredMissingReason,
@@ -18,6 +21,9 @@ import type {
 } from "../../grounding/types";
 
 type Fn<P> = (p: P) => string;
+
+/** The assumptions that can sit behind a swap figure. */
+export type SwapAssumptionId = Extract<AssumptionId, "vehicle-representative-category" | "private-vehicle-solo" | "commute-round-trip" | "equal-stove-efficiency">;
 
 export interface UiStrings {
   readonly app: { readonly name: string; readonly tagline: string };
@@ -65,10 +71,10 @@ export interface UiStrings {
     readonly badge: string;
     /** Headline: the 24-hour CPCB category in plain words. */
     readonly verdict: Readonly<Record<NaqiCategory, Fn<{ city: string }>>>;
-    readonly verdictBasis: string;
+    readonly verdictBasis: Fn<{ km: string }>;
     readonly scalePosition: Fn<{ category: string; n: string; total: string }>;
-    readonly cpcbSays: Fn<{ category: string }>;
-    readonly healthSource: string;
+    /** Attribution line under CPCB's verbatim statement. */
+    readonly cpcbAttribution: Fn<{ category: string }>;
     readonly aqiLabel: string;
     readonly aqiScope: string;
     readonly aqiCapped: string;
@@ -136,9 +142,45 @@ export interface UiStrings {
   };
   readonly swaps: {
     readonly targets: Readonly<Record<"bus" | "suburban-rail" | "metro" | "walk-cycle" | "png" | "lpg", string>>;
-    readonly kgPerDay: Fn<{ kg: string }>;
+    /** A lower bound, with the condition it holds under. */
+    readonly atLeastKgPerDay: Fn<{ kg: string }>;
+    /** As above; the source's hybrid row is lower, so petrol-car owners get that condition too. */
+    readonly atLeastKgPerDayPetrolCar: Fn<{ kg: string }>;
     readonly percentLess: Fn<{ pct: string }>;
     readonly ifAvailable: string;
+  };
+  readonly indoor: {
+    readonly title: string;
+    readonly intro: string;
+    readonly anyDay: string;
+    readonly becauseMeasured: Fn<{ category: string }>;
+    readonly categoryUnknown: string;
+    readonly leftOut: Fn<{ category: string }>;
+    readonly evidence: string;
+    readonly originalWording: string;
+    /** Set for languages whose advice text is Clearhour's own translation. */
+    readonly translationNote: string | null;
+  };
+  readonly swapsSection: {
+    readonly title: string;
+    readonly intro: string;
+    readonly none: string;
+    readonly evidence: string;
+    readonly sumKg: Fn<{ from: string; to: string; km: string; result: string }>;
+    readonly sumPercent: Fn<{ from: string; to: string; result: string }>;
+    readonly factorsTitle: string;
+    readonly factorLabels: Readonly<Record<FactorId | "none", string>>;
+    readonly factorUnits: Readonly<Record<FactorUnit, string>>;
+    readonly factorLine: Fn<{ label: string; value: string; unit: string }>;
+    readonly sourceRow: string;
+    readonly assumedTitle: string;
+    readonly assumed: Readonly<Record<SwapAssumptionId, string>>;
+    readonly noHybrids: string;
+    readonly dataAge: string;
+    readonly busScope: string;
+    readonly whyTitle: string;
+    readonly withheldTitle: string;
+    readonly withheld: Readonly<Record<WithheldReason, string>>;
   };
   readonly plan: {
     readonly title: string;
@@ -171,7 +213,7 @@ export const en: UiStrings = {
   },
   key: {
     measured: "Solid boxes are readings from a real air monitor.",
-    forecast: "Hazy boxes are a prediction for later today.",
+    forecast: "Hazy boxes are a computer prediction.",
   },
   header: { editAnswers: "Change answers", cityLabel: "City" },
   onboarding: {
@@ -232,24 +274,23 @@ export const en: UiStrings = {
       "very-poor": ({ city }) => `Very poor air in ${city} over the last 24 hours`,
       severe: ({ city }) => `Severe air pollution in ${city} over the last 24 hours`,
     },
-    verdictBasis: "Based on fine dust (PM2.5) at a government air monitor, graded on CPCB's scale.",
+    verdictBasis: ({ km }) => `From fine dust (PM2.5) at one government monitor, ${km} from the city centre.`,
     scalePosition: ({ category, n, total }) => `${category} is level ${n} of ${total} on CPCB's scale, from Good to Severe.`,
-    cpcbSays: ({ category }) => `What CPCB says about ${category} air`,
-    healthSource: "CPCB, National Air Quality Index (2014)",
-    aqiLabel: "Daily air level (AQI)",
-    aqiScope: "Out of 500, averaged over the last 24 hours",
+    cpcbAttribution: ({ category }) => `CPCB on ${category} air, National Air Quality Index (2014)`,
+    aqiLabel: "24-hour air level (AQI)",
+    aqiScope: "Out of 500, based on the last 24 hours",
     aqiCapped: "At the top of the scale",
     latestLabel: "Latest fine-dust reading (PM2.5)",
     observed: ({ time, ago }) => `For ${time}, ${ago}`,
-    aqiVsLatest: "The daily level covers 24 hours. The latest reading is a single hour, so the two can differ.",
+    aqiVsLatest: "The AQI covers 24 hours. The latest reading is a single hour, so the two can differ.",
     detailsTitle: "About these readings",
     station: ({ name, km }) => `Monitor: ${name}, ${km} from the city centre`,
     network: "A CPCB monitoring station. Readings come to us through OpenAQ.",
     lagNote: "Readings usually reach us a few hours after they are taken.",
-    aqiBasis: ({ hours }) => `The daily level is worked out from ${hours} hourly readings at this monitor in the last 24 hours, using CPCB's formula.`,
+    aqiBasis: ({ hours }) => `The 24-hour level is worked out from ${hours} hourly readings at this monitor in the last 24 hours, using CPCB's formula.`,
     pm25Only: "It counts fine dust (PM2.5) only. CPCB's official AQI also counts other pollutants, so the official figure can be higher.",
-    aqiTitle: "Daily air level (AQI) from fine dust (PM2.5), averaged over the last 24 hours",
-    noAqiTitle: "Not enough readings for a daily air level",
+    aqiTitle: "24-hour air level (AQI) from fine dust (PM2.5), averaged over the last 24 hours",
+    noAqiTitle: "No 24-hour air level right now",
     noPm25Now: "No recent fine-dust (PM2.5) reading from this monitor.",
     reasons: {
       "no-station-in-radius": "No government air monitor within 25 km of the city centre has sent a reading in the last 6 hours.",
@@ -258,7 +299,7 @@ export const en: UiStrings = {
       "openaq-schema-mismatch": "Monitor readings arrived in an unexpected format, so they aren't shown.",
     },
     naqiReasons: {
-      "insufficient-hours": "Not enough hourly readings in the last 24 hours to work out a daily air level (CPCB needs at least 16).",
+      "insufficient-hours": "Not enough hourly readings in the last 24 hours to work out a 24-hour air level (CPCB needs at least 16).",
       "no-sensor": "This monitor doesn't measure fine dust (PM2.5).",
       "no-live-sensor": "This monitor has no recent fine-dust (PM2.5) reading.",
       "openaq-unavailable": "This monitor's recent hours couldn't be reached.",
@@ -287,9 +328,9 @@ export const en: UiStrings = {
   },
   healthStatementIsTranslation: null,
   window: {
-    badge: "Prediction for later today",
-    cleanerThanRoutine: ({ best, routine }) => `Around ${best} looks clearly cleaner than the hours when you usually leave (${routine})`,
-    routineIsFine: ({ routine }) => `No other time today looks clearly cleaner than the hours when you usually leave (${routine})`,
+    badge: "Prediction for today",
+    cleanerThanRoutine: ({ best, routine }) => `Around ${best} looks clearly cleaner than when you usually leave (${routine})`,
+    routineIsFine: ({ routine }) => `No other time today looks clearly cleaner than when you usually leave (${routine})`,
     clearBest: ({ best }) => `Cleanest time to be outside today: around ${best}`,
     noClearBest: "No part of today is clearly cleaner than the rest",
     noClearBestDetail: "The cleanest stretch left today isn't clearly better than a typical one, so there's no better time to pick.",
@@ -324,7 +365,7 @@ export const en: UiStrings = {
     title: "Where this comes from",
     neverMixed: "Readings and predictions are never mixed into one number.",
     openaq: "Monitor readings: OpenAQ (CPCB stations)",
-    cpcb: "Daily air level formula and CPCB statements: CPCB National Air Quality Index (2014)",
+    cpcb: "24-hour air level formula and CPCB statements: CPCB National Air Quality Index (2014)",
     openMeteo: "Prediction: Open-Meteo (CC BY 4.0)",
     cams: "Generated using Copernicus Atmosphere Monitoring Service information",
   },
@@ -337,9 +378,68 @@ export const en: UiStrings = {
       png: "Switch to piped gas (PNG)",
       lpg: "Switch to LPG",
     },
-    kgPerDay: ({ kg }) => `${kg} kg less CO₂ per working day`,
-    percentLess: ({ pct }) => `${pct}% less CO₂ for the same heat`,
+    atLeastKgPerDay: ({ kg }) => `At least ${kg} kg less CO₂ per working day (there and back), if you travel alone`,
+    atLeastKgPerDayPetrolCar: ({ kg }) => `At least ${kg} kg less CO₂ per working day (there and back), if you travel alone and your car isn't a hybrid`,
+    percentLess: ({ pct }) => `About ${pct}% less CO₂ for the same cooking heat, assuming both stoves are equally efficient`,
     ifAvailable: "If it's available where you live or on your route.",
+  },
+  indoor: {
+    title: "Inside your home",
+    intro: "Advice from official sources, picked using your answers.",
+    anyDay: "Applies any day.",
+    becauseMeasured: ({ category }) => `Shown because fine dust over the last 24 hours was at the ${category} level.`,
+    categoryUnknown: "Meant for poor-air days. There's no 24-hour air level right now to check against.",
+    leftOut: ({ category }) =>
+      `Advice meant only for poor-air days is left out: fine dust over the last 24 hours was at the ${category} level. CPCB's official AQI also counts other pollutants and can be higher.`,
+    evidence: "Where this advice comes from",
+    originalWording: "Original wording",
+    translationNote: null,
+  },
+  swapsSection: {
+    title: "Ways to cut CO₂",
+    intro: "Based on your travel and cooking. These figures count CO₂ only.",
+    none: "We have no CO₂ swap to suggest for the travel and cooking you described.",
+    evidence: "How we worked this out",
+    sumKg: ({ from, to, km, result }) => `(${from} − ${to}) × ${km} km there and back = ${result} kg of CO₂`,
+    sumPercent: ({ from, to, result }) => `(${from} − ${to}) ÷ ${from} = ${result}% less`,
+    factorsTitle: "The published figures used",
+    factorLabels: {
+      "car-petrol": "Small petrol car (under 800 cc)",
+      "car-diesel": "Diesel hatchback (under 1000 cc)",
+      "car-cng": "Small CNG car (under 800 cc)",
+      "two-wheeler": "Motorcycle (under 125 cc)",
+      "bus-intracity": "City bus, per passenger",
+      "rail-suburban": "Suburban train, per passenger",
+      "lpg-combustion": "Burning LPG",
+      "natural-gas-combustion": "Burning natural gas",
+      "kerosene-combustion": "Burning kerosene",
+      none: "Walking or cycling (no fuel burned)",
+    },
+    factorUnits: {
+      "kgCO2/vehicle-km": "kg of CO₂ per km driven",
+      "kgCO2/passenger-km": "kg of CO₂ per passenger per km",
+      "kgCO2/TJ": "kg of CO₂ per terajoule of fuel energy",
+    },
+    factorLine: ({ label, value, unit }) => `${label}: ${value} ${unit}`,
+    sourceRow: "As printed in the source",
+    assumedTitle: "What we assumed",
+    assumed: {
+      "vehicle-representative-category": "We counted the smallest vehicle of your type in the source table. A bigger one would save more.",
+      "private-vehicle-solo": "You travel alone. Sharing a vehicle means each person saves less.",
+      "commute-round-trip": "You travel your distance there and back on a working day.",
+      "equal-stove-efficiency": "Both stoves turn the same share of their fuel into useful heat.",
+    },
+    noHybrids: "Hybrid cars are not covered: the source's hybrid figure is lower than the one used here.",
+    dataAge: "The transport figures date from 2015, the latest India-specific set we found. A newer vehicle may differ.",
+    busScope: "The bus figure is for ordinary city buses, not bus rapid transit or intercity buses.",
+    whyTitle: "Why this is suggested",
+    withheldTitle: "No figure for these",
+    withheld: {
+      "no-verified-metro-factor": "We haven't found a verified per-passenger figure for the metro, so we don't show a number.",
+      "no-per-passenger-auto-factor": "The source gives auto-rickshaw CO₂ per vehicle, not per passenger, so there's no fair comparison to show.",
+      "biomass-co2-not-comparable":
+        "CO₂ from wood, dung and crop waste is counted differently in international rules, and stoves vary too much to compare. The sources suggest cleaner fuel because of the air inside the home.",
+    },
   },
   plan: {
     title: "Your plan for today",

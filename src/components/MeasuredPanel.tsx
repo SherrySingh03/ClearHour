@@ -30,7 +30,7 @@ function Badge() {
   );
 }
 
-/** CPCB's six levels, with today's one raised. The sentence below it says the same in words. */
+/** CPCB's six levels, with the verdict's level raised. The sentence below it says the same in words. */
 function CategoryScale({ category }: { category: NaqiCategory }) {
   const { t, f } = useLocale();
   const idx = NAQI_CATEGORY_ORDER.indexOf(category);
@@ -68,7 +68,7 @@ function Figure({ value, unit, label, sub, extra }: { value: string; unit?: stri
 
 function Shell({ accent, children }: { accent: string; children: ReactNode }) {
   return (
-    <section aria-labelledby="measured-title" className="border-l-[6px] bg-station px-5 py-5 shadow-[0_1px_0_var(--smog-deep)]" style={{ borderColor: accent }}>
+    <section aria-labelledby="measured-title" className="border-l-[6px] bg-station px-5 py-4 shadow-[0_1px_0_var(--smog-deep)]" style={{ borderColor: accent }}>
       {children}
     </section>
   );
@@ -126,17 +126,13 @@ export function MeasuredPanel({ snapshot, now, city }: { snapshot: GroundingSnap
           <h2 id="measured-title" className="type-condensed mt-2 text-4xl leading-[1.05] font-semibold text-balance sm:text-5xl">
             {m.verdict[naqi.data.category]({ city })}
           </h2>
-          <p className="mt-2 text-sm text-muted">{m.verdictBasis}</p>
-          <CategoryScale category={naqi.data.category} />
-          <figure className="mt-4">
-            <figcaption className="text-sm font-medium">{m.cpcbSays({ category: t.categories[naqi.data.category] })}</figcaption>
-            <blockquote className="mt-1 border-l-2 border-ink/30 pl-3 text-lg leading-snug before:content-['“'] after:content-['”']">
-              {t.healthStatements[naqi.data.category]}
-            </blockquote>
-            <p className="mt-1 pl-3.5 text-xs text-muted">
-              {m.healthSource}
+          <p className="mt-1 text-sm leading-snug text-muted">{m.verdictBasis({ km: t.common.km({ km: f.number(coverage.distanceKm, 1) }) })}</p>
+          <figure className="mt-2 border-l-2 border-ink/30 pl-3">
+            <blockquote className="leading-snug before:content-['“'] after:content-['”']">{t.healthStatements[naqi.data.category]}</blockquote>
+            <figcaption className="text-xs leading-snug text-muted">
+              {m.cpcbAttribution({ category: t.categories[naqi.data.category] })}
               {t.healthStatementIsTranslation && <span className="block">{t.healthStatementIsTranslation}</span>}
-            </p>
+            </figcaption>
           </figure>
         </>
       ) : (
@@ -148,7 +144,7 @@ export function MeasuredPanel({ snapshot, now, city }: { snapshot: GroundingSnap
         </>
       )}
 
-      <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-ink/15 pt-4">
+      <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-ink/15 pt-3">
         {naqi.ok && (
           <Figure value={f.number(naqi.data.subIndex)} label={m.aqiLabel} sub={m.aqiScope} extra={naqi.data.cappedAtScaleMax && m.aqiCapped} />
         )}
@@ -163,11 +159,12 @@ export function MeasuredPanel({ snapshot, now, city }: { snapshot: GroundingSnap
           <p className="text-sm text-muted">{m.noPm25Now}</p>
         )}
       </div>
-      {naqi.ok && pm25 && <p className="mt-3 text-sm">{m.aqiVsLatest}</p>}
+      {naqi.ok && pm25 && <p className="mt-2 text-sm leading-snug">{m.aqiVsLatest}</p>}
 
-      <details className="group mt-4 text-sm">
+      <details className="mt-2 text-sm">
         <summary className="cursor-pointer font-medium underline decoration-ink/30 underline-offset-4">{m.detailsTitle}</summary>
-        <ul className="mt-2 space-y-1.5 text-muted">
+        {naqi.ok && <CategoryScale category={naqi.data.category} />}
+        <ul className="mt-3 space-y-1.5 text-muted">
           <li className="text-ink">{m.station({ name: station.name, km: t.common.km({ km: f.number(coverage.distanceKm, 1) }) })}</li>
           <li>{m.network}</li>
           <li>{m.lagNote}</li>

@@ -5,7 +5,8 @@
  */
 
 import type { Formatters, UiStrings } from "../i18n";
-import type { CitationId } from "../grounding/citations";
+import { CITATIONS, type CitationId } from "../grounding/citations";
+import type { Swap, SwapId } from "../sourced/swaps";
 import type { ForecastPoint, ForecastSeries } from "../grounding/types";
 import { OUTDOOR_END_HOUR, OUTDOOR_START_HOUR, type Comparison, type WindowResult } from "../plan/window";
 
@@ -27,51 +28,60 @@ export function describeAge(observedUtc: string, now: Date, t: UiStrings): strin
 
 export interface WindowView {
   readonly headline: string;
+  /** The predicted difference, with what it is measured from. Shown by the UI only, never given to the plan writer. */
+  readonly drop: string | null;
+  /** Everything else; contains no pollution amounts. */
   readonly details: readonly string[];
   /** Always true when a window is presented: the 3-hour caveat travels with it. */
   readonly showCaveat: boolean;
 }
 
 /** `against` names what the drop is measured from, so the sentence says it. */
-function comparisonLines(c: Comparison, against: "routine" | "typical", fromCat: string, toCat: string, t: UiStrings, f: Formatters): string[] {
+function dropLine(c: Comparison, against: "routine" | "typical", t: UiStrings, f: Formatters): string {
   const p = { drop: f.number(c.dropUgm3), pct: f.number(c.dropFraction * 100) };
-  const lines = [against === "routine" ? t.window.dropVsRoutine(p) : t.window.dropVsTypical(p)];
-  if (c.categoryImproved) lines.push(t.window.categoryShift({ from: fromCat, to: toCat }));
-  return lines;
+  return against === "routine" ? t.window.dropVsRoutine(p) : t.window.dropVsTypical(p);
+}
+
+function categoryLines(c: Comparison, fromCat: string, toCat: string, t: UiStrings): string[] {
+  return c.categoryImproved ? [t.window.categoryShift({ from: fromCat, to: toCat })] : [];
 }
 
 export function describeWindow(r: WindowResult, t: UiStrings, f: Formatters): WindowView {
   const range = (s: { startUtc: string; endUtc: string }) => f.timeRange(s.startUtc, s.endUtc);
   switch (r.verdict) {
     case "no-forecast":
-      return { headline: t.window.unavailable, details: [], showCaveat: false };
+      return { headline: t.window.unavailable, drop: null, details: [], showCaveat: false };
     case "insufficient-forecast":
       // The forecast exists (the curve is drawn); there is just no full stretch left in today's outdoor hours.
       return {
         headline: t.window.tooLate,
+        drop: null,
         details: [t.window.tooLateDetail({ from: f.clockHour(OUTDOOR_START_HOUR), to: f.clockHour(OUTDOOR_END_HOUR) })],
         showCaveat: false,
       };
     case "cleaner-than-routine":
       return {
         headline: t.window.cleanerThanRoutine({ best: range(r.best), routine: range(r.routine) }),
-        details: comparisonLines(r.comparison, "routine", t.categories[r.routine.indicativeCategory], t.categories[r.best.indicativeCategory], t, f),
+        drop: dropLine(r.comparison, "routine", t, f),
+        details: categoryLines(r.comparison, t.categories[r.routine.indicativeCategory], t.categories[r.best.indicativeCategory], t),
         showCaveat: true,
       };
     case "routine-is-fine":
-      return { headline: t.window.routineIsFine({ routine: range(r.routine) }), details: [], showCaveat: true };
+      return { headline: t.window.routineIsFine({ routine: range(r.routine) }), drop: null, details: [], showCaveat: true };
     case "clear-best":
       return {
         headline: t.window.clearBest({ best: range(r.best) }),
+        drop: dropLine(r.comparison, "typical", t, f),
         details: [
           ...(r.routinePassed ? [t.window.routinePassed] : []),
-          ...comparisonLines(r.comparison, "typical", t.categories[r.baseline.indicativeCategory], t.categories[r.best.indicativeCategory], t, f),
+          ...categoryLines(r.comparison, t.categories[r.baseline.indicativeCategory], t.categories[r.best.indicativeCategory], t),
         ],
         showCaveat: true,
       };
     case "no-clear-best":
       return {
         headline: t.window.noClearBest,
+        drop: null,
         details: [...(r.routinePassed ? [t.window.routinePassed] : []), t.window.noClearBestDetail],
         showCaveat: true,
       };
@@ -101,7 +111,44 @@ export function describeForecastRange(points: readonly ForecastPoint[], t: UiStr
   return t.chart.summary({ min: f.number(min.pm25), max: f.number(max.pm25), minAt: f.time(min.timeUtc), maxAt: f.time(max.timeUtc) });
 }
 
+/**
+ * Link text for a source: who published it and when. Not the registry title,
+ * which describes what we first used the document for; the page locator shown
+ * with each quote or factor says where in it to look.
+ */
+export function citationLabel(id: CitationId): string {
+  const c = CITATIONS[id];
+  return `${c.publisher}, ${c.year}`;
+}
+
 /** One link per source document, however many items or factors in a plan step cite it. */
 export function uniqueCitations(ids: readonly (CitationId | null)[]): CitationId[] {
   return [...new Set(ids.filter((id): id is CitationId => id !== null))];
+}
+
+export type SwapTarget = keyof UiStrings["swaps"]["targets"];
+
+export function swapTarget(id: SwapId): SwapTarget {
+  if (id === "cooking:lpg->png") return "png";
+  if (id === "cooking:kerosene->lpg" || id === "cooking:biomass->lpg") return "lpg";
+  return id.split("->")[1] as SwapTarget;
+}
+
+/**
+ * Rounds DOWN to two significant figures: a value shown as "at least X" must
+ * never exceed the computed one.
+ */
+export function floorTo2Significant(x: number): number {
+  if (!(x > 0)) return 0;
+  const exponent = Math.floor(Math.log10(x)) - 1;
+  const step = 10 ** exponent;
+  return Number((Math.floor(x / step + 1e-9) * step).toFixed(Math.max(0, -exponent)));
+}
+
+/** The saving, always with the conditions it holds under. */
+export function describeSaving(s: Swap, t: UiStrings, f: Formatters): string {
+  if (s.saving.quantity !== "kgCO2-per-working-day") return t.swaps.percentLess({ pct: f.number(s.saving.value) });
+  const p = { kg: f.number(floorTo2Significant(s.saving.value), 4) };
+  // A hybrid row in the source is lower than the petrol factor used, so the bound excludes hybrids.
+  return s.saving.from.factorId === "car-petrol" ? t.swaps.atLeastKgPerDayPetrolCar(p) : t.swaps.atLeastKgPerDay(p);
 }
