@@ -202,7 +202,7 @@ Every number below was checked on 2026-11-25 against the publisher's own documen
 
 ### Advice wording audit (2026-11-27)
 
-Every advice and swap string (200: advice text in both languages, quotes, page locators, swap and indoor labels, CPCB statements, factor rows) was re-read against its source document, the scanned advisory from its page images. Corrected: verbs stronger or weaker than the source ("don't" for "avoid"; an added "if you can" on clean fuels; "clean or replace" for "replace and clean"), narrowed or widened scope ("closed rooms" for "closed premises"; pregnant women left out; "heating" left out), a dropped "during winters", three quotes cut off from the words they depend on, and two labels claiming more than the data. Where the plan writer may not use a word (pregnancy), its copy covers only the groups the app asks about.
+Every advice and swap string (200: advice text in both languages, quotes, page locators, swap and indoor labels, CPCB statements, factor rows) was re-read against its source document, the scanned advisory from its page images. Corrected: verbs stronger or weaker than the source ("don't" for "avoid"; an added "if you can" on clean fuels; "clean or replace" for "replace and clean"), narrowed or widened scope ("closed rooms" for "closed premises"; pregnant women left out; "heating" left out), a dropped "during winters", two quotes cut off from the words they depend on, and two labels claiming more than the data. Where the plan writer may not use a word (pregnancy), its copy covers only the groups the app asks about.
 
 ### Sourcing log: what was checked and not used
 
