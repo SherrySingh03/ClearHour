@@ -20,7 +20,8 @@
  *    it is (24-hour AQI as 24-hour and never "now"; the latest reading never
  *    "now" or a forecast). Savings and forecast differences are never given
  *    to the model, so it cannot quote or reverse them: only the UI shows them
- *  - language: written in the requested language
+ *  - language: written in the requested language, with no letters from a
+ *    script other than Latin and Devanagari
  */
 
 import { z } from "zod";
@@ -80,6 +81,12 @@ function misboundNumber(text: string, a: PlanAllowance): string | null {
   return null;
 }
 
+/**
+ * A letter from any script other than the two we write in. The micro sign (and
+ * the Greek mu that NFKC turns it into) is allowed for µg/m³.
+ */
+const FOREIGN_LETTER = /(?![\p{Script=Latin}\p{Script=Devanagari}\u00B5\u03BC])\p{L}/u;
+
 /** Share of letters that are Devanagari. */
 function devanagariShare(text: string): number {
   const letters = text.match(/\p{L}/gu) ?? [];
@@ -125,6 +132,8 @@ export function validatePlan(raw: unknown, a: PlanAllowance): Grounded<Plan, Pla
     if (misbound !== null) return missing("number-role", misbound);
   }
 
+  // Stray text in a third script (seen live: Japanese mid-sentence) is not either language.
+  if (texts.some((x) => FOREIGN_LETTER.test(x))) return missing("wrong-language");
   const share = devanagariShare(texts.join(" "));
   if (a.locale === "hi" ? share < 0.5 : share > 0.05) return missing("wrong-language");
 

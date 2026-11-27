@@ -104,6 +104,7 @@ export function buildPlanInput({ snapshot, profile, locale, now }: PlanInput) {
       action: t.swaps.targets[swapTarget(s.id)],
       saving: describeSaving(s, t, f),
       onlyIfAvailable: s.conditional,
+      why: s.why,
       factors: [s.saving.from, s.saving.to].map((term) => ({
         factorId: term.factorId,
         value: term.value,
@@ -121,7 +122,7 @@ export function buildPlanInput({ snapshot, profile, locale, now }: PlanInput) {
     household,
     guidance: guidance.map((g) => ({
       id: g.item.id,
-      text: g.item.text[locale],
+      text: (g.item.writerText ?? g.item.text)[locale],
       appliesBecause: g.triggeredBy === null ? "every-day" : g.triggeredBy.basis === "unknown" ? "on-poor-days-category-unknown" : `today-${g.triggeredBy.basis}`,
     })),
     swaps: swaps.map((s) => ({ id: s.id, action: t.swaps.targets[swapTarget(s.id)], lowersCO2: true, onlyIfAvailable: s.conditional })),

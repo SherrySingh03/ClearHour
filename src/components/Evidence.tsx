@@ -17,7 +17,8 @@ export function Evidence({ summary, children }: { summary: string; children: Rea
 
 /**
  * A source's own words (always in the source's language) with its page locator
- * and a link. Several quotes from one document share a single link.
+ * and a link. Several quotes from one document share a single link, so it is
+ * always clear which document a quote is from.
  */
 export function Quotes({ items }: { items: readonly { citation: CitationId; locator: string; quote: string }[] }) {
   const { t } = useLocale();

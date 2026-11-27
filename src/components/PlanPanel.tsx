@@ -5,6 +5,7 @@ import { CITATIONS } from "@/lib/grounding/citations";
 import type { PreparedPlan } from "@/lib/plan/types";
 import type { HouseholdProfile } from "@/lib/profile/types";
 import { citationLabel, describeAge, describeGap, uniqueCitations } from "@/lib/view/describe";
+import { Evidence, Quotes } from "./Evidence";
 import { useLocale } from "./LocaleContext";
 
 type Load = { status: "idle" } | { status: "loading" } | { status: "failed" } | { status: "ready"; data: PreparedPlan; receivedAt: Date };
@@ -85,6 +86,17 @@ export function PlanPanel({ profile, live }: { profile: HouseholdProfile; live: 
                             </a>
                           </p>
                         ))}
+                        {/* The cited words, one tap away, so a reader can compare them with the note. */}
+                        <Evidence summary={t.plan.sourceSays}>
+                          {t.indoor.translationNote && (
+                            <div>
+                              <p className="text-ink">{ref.text}</p>
+                              <p className="text-xs">{t.indoor.translationNote}</p>
+                            </div>
+                          )}
+                          <p className="font-medium text-ink">{t.indoor.originalWording}</p>
+                          <Quotes items={ref.sources} />
+                        </Evidence>
                       </div>
                     )}
                     {ref?.kind === "swap" && (
@@ -99,6 +111,11 @@ export function PlanPanel({ profile, live }: { profile: HouseholdProfile; live: 
                             </a>
                           </p>
                         ))}
+                        {/* These quotes are from other documents than the figure's link above, so each names its own. */}
+                        <Evidence summary={t.plan.sourceSays}>
+                          <p className="font-medium text-ink">{t.indoor.originalWording}</p>
+                          <Quotes items={ref.why} />
+                        </Evidence>
                       </div>
                     )}
                   </li>

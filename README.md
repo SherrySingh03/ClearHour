@@ -80,15 +80,15 @@ GEMINI                 chooses 1–5 items, orders them, writes short notes
   ▼
 Validator (no AI)      accepts the whole plan or rejects the whole plan
   ▼
-UI                     Gemini's notes with source links, amounts and the forecast
-                       outlook, which come from the app's own data, never from Gemini
+UI                     Gemini's notes with source links, verbatim quotes one tap away,
+                       amounts and the forecast outlook, all from the app's own data
 ```
 
 Key files: `src/app/api/plan/route.ts` → `src/lib/plan/server.ts` → `packet.ts` → `prompt.ts` + `gemini.ts` → `model-chain.ts` → `validate.ts` + `lexicon.ts`. The model call is server-only (`server-only` import); the key never reaches the browser. The rest of the page (reading, forecast, advice, swaps) works without Gemini.
 
 ### What Gemini does
 
-**Synthesis**: it connects the household's answers, today's measured category, the forecast outlook and best stretch, and the cited advice into a short plan ("who, what, when"). The prompt allows reasons only from those facts, forbids causes or benefits the cited text doesn't state, and requires each item's conditions, hedges and hours to be kept. It is also told not to write readings (the page shows them above the plan, which may be read hours later); the validator still checks any number it writes.
+**Synthesis**: it connects the household's answers, today's measured category, the forecast outlook and best stretch, and the cited advice into a short plan ("who, what, when"). Today's air and the forecast are connected to the household in the headline and the best-time step. The prompt forbids causes or benefits the cited text doesn't state, and forbids changing any condition or scope of cited advice: a standing rule stays standing, a conditional one keeps its condition. These prompt rules are not machine-checked; each step has a **What the source says** tap with the verbatim quotes so a reader can compare. It is also told not to write readings (the page shows them above the plan, which may be read hours later); the validator still checks any number it writes.
 
 ### What Gemini receives
 
@@ -119,7 +119,7 @@ Structured JSON only: a headline, 1–5 steps (each pointing at an id from the p
 | **Health thresholds and health claims** | No thresholds or CPCB health statements are sent. A per-language word list (health, medical, safety, exposure, risk, caution and more; `lexicon.ts`) rejects any match. CPCB's statement is shown verbatim by the app. |
 | Invented items | Step ids must come from the packet, without repeats; no "window" step without a forecast. |
 | Hiding missing data | The plan must list exactly the packet's gap codes. |
-| Links, wrong language, oversize text | Rejected. |
+| Links, wrong language (including any letters from a third script), oversize text | Rejected. |
 
 **Limits of this check.** It is a rule-based filter, not a proof of meaning:
 
@@ -249,7 +249,7 @@ All UI text comes from `getUiStrings(locale)` (`src/lib/i18n`). JSX contains no 
 
 ## Known limitations
 
-- **What is and isn't machine-checked in a plan.** Numeric claims are structurally validated and bound to their source role: each number must appear in the input as the same kind of thing, and measured values must be quoted with their timeframe. **Qualitative phrasing is constrained by the prompt and linked to its source, but is not machine-checked.** A note can misstate a reason, weaken a condition or misdescribe a part of the day without using any number (seen on 2026-11-26: a note said to wet-mop "to keep dust from settling", which no source says). The exact cited wording is in **Inside your home**; amounts, sources and the forecast outlook come from the app's own data.
+- **What is and isn't machine-checked in a plan.** Numeric claims are structurally validated and bound to their source role: each number must appear in the input as the same kind of thing, and measured values must be quoted with their timeframe. **Qualitative phrasing is constrained by the prompt and linked to its source, but is not machine-checked.** A note can misstate a reason, drop or add a condition, or misdescribe a part of the day without using any number. Seen on 2026-11-26: a note gave a reason no source states for wet-mopping; another made a standing ban on coils and incense conditional on poor air; a third dropped "on poor-to-severe days". The prompt now forbids these explicitly, which lowers but cannot rule out the risk. Open **What the source says** under a step, or **Inside your home**, for the exact cited wording; amounts, sources and the forecast outlook come from the app's own data.
 - **Gemini free-tier quota.** The daily allowance is small (20 requests for each Flash model; the Flash-Lite limits are unconfirmed). When it is used up, or models are overloaded, the plan is unavailable until later; everything else on the page works.
 - **Shared OpenAQ limit.** All visitors share one API key. Many *different* cities requested within a minute can exhaust it, and the later ones say monitor readings couldn't be reached for a short while (seen on 2026-11-26 requesting all 26 cities back to back). The grounding cache is in server memory, so on serverless hosting it does little to prevent this. The per-IP rate limit does not stop many visitors adding up. The forecast is unaffected.
 - **Bengaluru's monitor and PM2.5.** On 2026-11-26 the monitor chosen for Bengaluru reported PM10 but no PM2.5, so the page shows no 24-hour air level and says why. It does not fall back to another pollutant.

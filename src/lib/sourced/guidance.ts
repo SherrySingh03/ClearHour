@@ -38,6 +38,12 @@ export interface GuidanceItem {
     readonly cookingFuel?: readonly CookingFuel[];
   };
   readonly text: Localized;
+  /**
+   * The same advice as given to the plan writer, where `text` carries an
+   * attribution or a warning the writer may not repeat. Only those clauses are
+   * left out: every condition and hedge stays, word for word.
+   */
+  readonly writerText?: Localized;
   readonly sources: readonly GuidanceSource[];
 }
 
@@ -126,6 +132,10 @@ export const GUIDANCE: readonly GuidanceItem[] = [
       en: "Don't heat a closed room with an angithi (wood or charcoal brazier): the advisory warns this may be fatal because of carbon monoxide.",
       hi: "बंद कमरे को अंगीठी (लकड़ी या कोयले) से गर्म न करें: सलाह के अनुसार कार्बन मोनोऑक्साइड के कारण यह जानलेवा हो सकता है।",
     },
+    writerText: {
+      en: "Don't heat a closed room with an angithi (wood or charcoal brazier).",
+      hi: "बंद कमरे को अंगीठी (लकड़ी या कोयले) से गर्म न करें।",
+    },
     sources: [
       {
         citation: MOHFW,
@@ -157,6 +167,10 @@ export const GUIDANCE: readonly GuidanceItem[] = [
     text: {
       en: "On poor-to-severe days, the health ministry says an air purifier may help. If you use one, follow the maker's instructions and clean or replace filters as directed.",
       hi: "स्वास्थ्य मंत्रालय के अनुसार खराब से गंभीर AQI वाले दिनों में एयर प्यूरीफ़ायर मददगार हो सकता है। इस्तेमाल करें तो निर्माता के निर्देश मानें और फ़िल्टर बताए अनुसार साफ़ करें या बदलें।",
+    },
+    writerText: {
+      en: "On poor-to-severe days, an air purifier may help. If you use one, follow the maker's instructions and clean or replace filters as directed.",
+      hi: "खराब से गंभीर AQI वाले दिनों में एयर प्यूरीफ़ायर मददगार हो सकता है। इस्तेमाल करें तो निर्माता के निर्देश मानें और फ़िल्टर बताए अनुसार साफ़ करें या बदलें।",
     },
     sources: [
       {
@@ -239,11 +253,17 @@ export const GUIDANCE: readonly GuidanceItem[] = [
       en: "On poor-to-severe days, the health ministry advises young children and elderly people to limit going outdoors as far as possible.",
       hi: "खराब से गंभीर AQI वाले दिनों में स्वास्थ्य मंत्रालय की सलाह है कि छोटे बच्चे और बुज़ुर्ग जहाँ तक हो सके बाहर कम निकलें।",
     },
+    writerText: {
+      en: "On poor-to-severe days, young children and elderly people should limit going outdoors as far as possible.",
+      hi: "खराब से गंभीर AQI वाले दिनों में छोटे बच्चे और बुज़ुर्ग जहाँ तक हो सके बाहर कम निकलें।",
+    },
     sources: [
       {
         citation: MOHFW,
-        locator: "Annexure II (Social Media Messages), item 4(g), PDF p. 22",
-        quote: "high risk people like pregnant women, young children and elderly should restrict outdoor movements as far as possible.",
+        locator: "Annexure II (Social Media Messages), item 4 (lead-in) and 4(g), PDF p. 22",
+        // The condition is in item 4's lead-in, so the quote must carry it.
+        quote:
+          "On days of poor to severe plus air pollution (AQI>200) … high risk people like pregnant women, young children and elderly should restrict outdoor movements as far as possible.",
       },
     ],
   },

@@ -272,3 +272,29 @@ describe("a number keeps the kind it had in the input", () => {
     expect(check("Open the windows twice.")).toEqual({ ok: false, reason: "number-word" });
   });
 });
+
+describe("no third script", () => {
+  const { allowance } = buildPlanInput(input);
+  const check = (note: string, a = allowance) => validatePlan(withStep(2, note), a);
+
+  it.each([
+    ["Japanese mid-sentence (seen live)", "Keep outside doors and windows shut inことがあります."],
+    ["Chinese", "Take the bus 巴士 on your commute."],
+    ["Cyrillic look-alike", "Take the bus on your соmmute."],
+    ["Greek", "Take the bus, αlways."],
+    ["Bengali", "Take the bus বাস today."],
+  ])("rejects %s", (_, note) => {
+    expect(check(note)).toEqual({ ok: false, reason: "wrong-language" });
+  });
+
+  it("rejects it in a Hindi plan too", () => {
+    const hi = buildPlanInput({ ...input, locale: "hi" }).allowance;
+    const plan = { headline: "आज की योजना।", steps: [{ kind: "swap", refId: "commute:car-petrol->bus", note: "बस से जाएँ ことがあります।" }], acknowledgedGaps: [] };
+    expect(validatePlan(plan, hi)).toEqual({ ok: false, reason: "wrong-language" });
+  });
+
+  it("still allows µg/m³, CO₂ and accented Latin", () => {
+    expect(check("The latest reading was 45 µg/m³ at the café; the bus lowers CO₂.").ok).toBe(true);
+    expect(check("The latest reading was 45 μg/m3 at the station.").ok).toBe(true);
+  });
+});

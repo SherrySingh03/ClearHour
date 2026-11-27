@@ -64,6 +64,8 @@ export type RefDetail =
       readonly saving: string;
       /** The alternative may not exist on this route (metro, local train, piped gas). */
       readonly onlyIfAvailable: boolean;
+      /** The published recommendations behind the swap, verbatim. */
+      readonly why: readonly { readonly citation: CitationId; readonly locator: string; readonly quote: string }[];
       readonly factors: readonly { readonly factorId: string; readonly value: number; readonly unit: string; readonly citation: CitationId | null }[];
     };
 

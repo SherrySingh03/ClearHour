@@ -118,8 +118,9 @@ const WHY_GAS_IS_CLEAN: readonly SourcedReason[] = [
   {
     citation: "who-household-air-2025",
     locator: "Fact sheet, section 'Key facts'",
+    // "These" refers to the sentence before, which the quote therefore includes.
     quote:
-      "These include solar, electricity, biogas, liquefied petroleum gas (LPG), natural gas, alcohol fuels, as well as biomass stoves that meet the emission targets in the WHO Guidelines.",
+      "It is essential to expand use of clean fuels and technologies to reduce household air pollution and protect health. These include solar, electricity, biogas, liquefied petroleum gas (LPG), natural gas, alcohol fuels, as well as biomass stoves that meet the emission targets in the WHO Guidelines.",
   },
 ];
 

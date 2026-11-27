@@ -268,6 +268,7 @@ export const hi: UiStrings = {
     retry: "फिर कोशिश करें",
     gapsIntro: "इस योजना में यह नहीं है:",
     seeForecast: "ऊपर अनुमान देखें",
+    sourceSays: "स्रोत क्या कहता है",
     source: ({ title }) => `स्रोत: ${title}`,
   },
   errors: {

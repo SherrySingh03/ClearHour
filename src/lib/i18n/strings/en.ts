@@ -194,6 +194,7 @@ export interface UiStrings {
     /** A plan is reused for up to three hours, so it says when it was generated and from what. */
     readonly preparedAt: Fn<{ time: string; ago: string; reading: string | null }>;
     readonly outlookUsed: Fn<{ items: readonly { part: string; category: string }[] }>;
+    readonly sourceSays: string;
     readonly retry: string;
     readonly gapsIntro: string;
     readonly seeForecast: string;
@@ -469,6 +470,7 @@ export const en: UiStrings = {
     retry: "Try again",
     gapsIntro: "This plan is missing:",
     seeForecast: "See the prediction above",
+    sourceSays: "What the source says",
     source: ({ title }) => `Source: ${title}`,
   },
   errors: {
