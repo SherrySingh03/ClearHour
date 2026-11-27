@@ -21,8 +21,10 @@
  *    "now" or a forecast). Savings and forecast differences are never given
  *    to the model, so it cannot quote or reverse them: only the UI shows them
  *  - forecast label: the best-time step must say "forecast" or "predicted"
- *    (पूर्वानुमान), and in it and the headline every sentence naming a clock time
- *    or part of the day must carry that label itself
+ *    (पूर्वानुमान in a Hindi plan), and in it and the headline every sentence
+ *    naming a clock time or part of the day must carry that label itself
+ *  - poor days: the headline names no time, and a time in the best-time step
+ *    comes with "if you need to go out"
  *  - language: written in the requested language, with no letters from a
  *    script other than Latin and Devanagari
  */
@@ -31,6 +33,7 @@ import { z } from "zod";
 import { missing, ok, type Grounded } from "../grounding/types";
 import { containsNumberWord, hasForecastLabel, healthConcept, mentionsDayPart, mentionsForecast, mentionsLast24Hours, mentionsNow } from "./lexicon";
 import { hasUnsupportedNumerals, normalise, numberTokens, sentences } from "./numbers";
+import type { Locale } from "../i18n/locales";
 import type { NumberRole, Plan, PlanAllowance } from "./types";
 
 export const LIMITS = { headline: 160, note: 240, maxSteps: 5 } as const;
@@ -47,6 +50,7 @@ export type PlanRejection =
   | "unknown-number"
   | "number-role"
   | "forecast-unlabelled"
+  | "poor-day-unqualified"
   | "wrong-language";
 
 const PlanSchema = z.object({
@@ -91,27 +95,43 @@ function misboundNumber(text: string, a: PlanAllowance): string | null {
  */
 const FOREIGN_LETTER = /(?![\p{Script=Latin}\p{Script=Devanagari}\u00B5\u03BC])\p{L}/u;
 
-/** "a.m." → "am", so it doesn't end a sentence; a final one keeps its full stop. */
-const plainMeridiem = (text: string) => text.replace(/\b([AaPp])\.[Mm]\.(?=\s+\p{Lu})/gu, "$1m.").replace(/\b([AaPp])\.[Mm]\./g, "$1m");
+/**
+ * "a.m." → "am." The full stop is kept, so the abbreviation can never join two
+ * sentences and let a label in one cover a time in the other. Splitting where a
+ * sentence didn't end only makes the check stricter.
+ */
+const splitSafeMeridiem = (text: string) => text.replace(/\b([ap])\.\s?m\./gi, "$1m.");
 
-/** The household's own departure time as a plan would write it, with any day-part word before it. */
-function departurePattern(hour: number): RegExp {
-  const h = hour % 12 || 12;
-  return new RegExp(`(?:(?:सुबह|दोपहर|शाम|रात)\\s*)?(?<![\\d:])${h}(?::00\\s*(?:am|pm|बजे)?|\\s*(?:am|pm|बजे))`, "gi");
+/**
+ * The household's departure exactly as the page writes it ("9:00 am",
+ * "सुबह 8:00"), also accepted without ":00" and, in Hindi, with "बजे".
+ */
+function departurePattern(departureText: string): RegExp {
+  const escaped = normalise(departureText).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const flexible = escaped.replace(":00", "(?::00)?").replace(/\s+/g, "\\s*");
+  return new RegExp(`(?<![\\d:])${flexible}(?![\\d:])(?:\\s*बजे)?`, "i");
 }
 
 /**
  * True if any sentence names a clock time or a part of the day without saying,
- * in that same sentence, that it is a forecast. The household's own departure
- * time is not a forecast and is set aside first.
+ * in that same sentence and in the plan's language, that it is a forecast.
+ * One exception: a sentence whose sole time is the household's own departure.
  */
 function hasUnlabelledForecastSentence(text: string, a: PlanAllowance): boolean {
-  return sentences(plainMeridiem(normalise(text))).some((sentence) => {
-    const rest = a.departureHour === null ? sentence : sentence.replace(departurePattern(a.departureHour), " ");
+  const departure = a.departureText === null ? null : departurePattern(a.departureText);
+  return sentences(splitSafeMeridiem(normalise(text))).some((sentence) => {
+    // Only one occurrence is set aside: any other time or part of day still needs the label.
+    const rest = departure === null ? sentence : sentence.replace(departure, " ");
     const claimsATime = mentionsDayPart(rest) || numberTokens(rest, a.names).some((n) => n.kind === "time");
-    return claimsATime && !hasForecastLabel(sentence);
+    return claimsATime && !hasForecastLabel(sentence, a.locale);
   });
 }
+
+/** On a poor day, the words that make a named time conditional on having to go out. */
+const GO_OUT_CONDITION: Readonly<Record<Locale, RegExp>> = {
+  en: /\bif you (?:(?:need|have) to|must) (?:go|be) out(?:side|doors)?\b/i,
+  hi: /(?:अगर|यदि) (?:आपको )?बाहर (?:जाना|निकलना) (?:ज़रूरी|जरूरी) हो/,
+};
 
 /** Share of letters that are Devanagari. */
 function devanagariShare(text: string): number {
@@ -160,14 +180,27 @@ export function validatePlan(raw: unknown, a: PlanAllowance): Grounded<Plan, Pla
 
   // Stray text in a third script (seen live: Japanese mid-sentence) is not either language.
   if (texts.some((x) => FOREIGN_LETTER.test(x))) return missing("wrong-language");
+  const share = devanagariShare(texts.join(" "));
+  if (a.locale === "hi" ? share < 0.5 : share > 0.05) return missing("wrong-language");
+
   // Headline and best-time step only: cited advice legitimately names mornings
   // and evenings. assumptions.ts#plan-forecast-label
   const windowNotes = p.steps.filter((x) => x.kind === "window").map((x) => x.note);
-  if (windowNotes.some((x) => !hasForecastLabel(x))) return missing("forecast-unlabelled");
+  if (windowNotes.some((x) => !hasForecastLabel(x, a.locale))) return missing("forecast-unlabelled");
   if ([p.headline, ...windowNotes].some((x) => hasUnlabelledForecastSentence(x, a))) return missing("forecast-unlabelled");
 
-  const share = devanagariShare(texts.join(" "));
-  if (a.locale === "hi" ? share < 0.5 : share > 0.05) return missing("wrong-language");
+  // Poor-or-worse days (assumptions.ts#window-poor-day-wording): no time is a time to be outside.
+  if (a.poorDay) {
+    // The household's own departure time is not a time being offered to them.
+    const departure = a.departureText === null ? null : departurePattern(a.departureText);
+    const namesATime = (x: string) => {
+      const rest = departure === null ? x : splitSafeMeridiem(normalise(x)).replace(departure, " ");
+      return numberTokens(rest, a.names).some((n) => n.kind === "time");
+    };
+    if (namesATime(p.headline)) return missing("poor-day-unqualified", "headline");
+    const condition = GO_OUT_CONDITION[a.locale];
+    if (windowNotes.some((x) => namesATime(x) && !condition.test(x.normalize("NFC")))) return missing("poor-day-unqualified", "window");
+  }
 
   return ok({ headline: p.headline, steps: p.steps, acknowledgedGaps: p.acknowledgedGaps as Plan["acknowledgedGaps"] });
 }

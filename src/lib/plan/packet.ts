@@ -13,7 +13,7 @@ import { findCity } from "../grounding/cities";
 import { EMISSION_FACTORS } from "../sourced/emissionFactors";
 import type { GroundingSnapshot } from "../grounding/types";
 import type { HouseholdProfile } from "../profile/types";
-import { categorySignal, selectGuidance } from "../sourced/guidance";
+import { categorySignal, isPoorOrWorse, selectGuidance } from "../sourced/guidance";
 import { swapsFor } from "../sourced/swaps";
 import { bestWindow, dayOutlook } from "./window";
 import { describeSaving, describeWindow, swapTarget } from "../view/describe";
@@ -32,6 +32,7 @@ export function buildPlanInput({ snapshot, profile, locale, now }: PlanInput) {
   const f = getFormatters(locale);
   const gaps: GapCode[] = [];
   const bindings: NumberBinding[] = [];
+  const poorDay = isPoorOrWorse(categorySignal(snapshot));
 
   // Measured
   let measured: Record<string, unknown>;
@@ -73,10 +74,13 @@ export function buildPlanInput({ snapshot, profile, locale, now }: PlanInput) {
   } else {
     const departureHour = profile.commute.mode === "none" ? undefined : profile.commute.departureHour;
     const result = bestWindow({ forecast: snapshot.forecast.data, now, ...(departureHour === undefined ? {} : { departureHour }) });
-    const view = describeWindow(result, t, f);
+    const view = describeWindow(result, t, f, poorDay);
     windowAvailable = view.showCaveat;
+    // The on-screen caveat is not sent: the page prints it, and its wording trips the writer's word list.
+    // The go-out condition goes only with a verdict that names a time, so it is never attached to nothing.
+    const namesATime = result.verdict === "clear-best" || result.verdict === "cleaner-than-routine" || result.verdict === "routine-is-fine";
     outlook = dayOutlook(snapshot.forecast.data, now).map((o) => ({ part: t.window.dayParts[o.part], category: t.categories[o.indicativeCategory] }));
-    forecast = { available: true, isModelPrediction: true, verdict: result.verdict, statement: view.headline, details: view.details, outlookByPartOfDay: outlook, caveat: windowAvailable ? t.window.caveat : null };
+    forecast = { available: true, isModelPrediction: true, verdict: result.verdict, statement: view.headline, details: view.details, outlookByPartOfDay: outlook, ...(poorDay && namesATime ? { goOutCondition: t.window.goOutCondition } : {}) };
   }
 
   // Household
@@ -155,12 +159,13 @@ export function buildPlanInput({ snapshot, profile, locale, now }: PlanInput) {
     tokens,
     known,
     names,
-    departureHour: commuting ? (profile.commute.departureHour ?? null) : null,
+    departureText: household.usualDeparture,
+    poorDay,
     bindings,
     guidanceIds: new Set(guidance.map((g) => g.item.id)),
     swapIds: new Set(swaps.map((s) => s.id)),
     windowAvailable,
     gaps,
   };
-  return { packet, allowance, refs, outlook };
+  return { packet, allowance, refs, outlook, poorDay };
 }

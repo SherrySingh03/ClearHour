@@ -32,6 +32,10 @@ describe("prompt rules that protect cited advice", () => {
     expect(SYSTEM_PROMPT).not.toMatch(/don't burn mosquito|closed rooms/i);
   });
 
+  it("never offers a time as a time to be outside on a poor day", () => {
+    expect(SYSTEM_PROMPT).toContain("no time is a good time to be outside");
+  });
+
   it("does not push the model away from its source", () => {
     expect(SYSTEM_PROMPT).not.toMatch(/Do not copy|only restates/i);
     expect(SYSTEM_PROMPT).toContain("Staying close to the item's own wording is fine");

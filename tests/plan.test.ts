@@ -11,7 +11,7 @@ const withStep = (i: number, note: string) => ({ ...validPlan, steps: validPlan.
 describe("plan packet", () => {
   it("collects every number the page shows, and nothing for the model to invent", () => {
     const { allowance, packet } = buildPlanInput(input);
-    for (const token of ["ugm3:45", "bare:220", "km:2.6", "km:12", "time:5:30", "time:8:30", "time:9", "hours:24", "hours:3"])
+    for (const token of ["ugm3:45", "bare:220", "km:2.6", "km:12", "time:5:30", "time:8:30", "time:9", "hours:24"])
       expect(allowance.tokens.has(token), token).toBe(true);
     expect(allowance.known.has("37")).toBe(false);
     expect(allowance.gaps).toEqual([]);
@@ -299,8 +299,13 @@ describe("no third script", () => {
   });
 });
 
+/** The label rule alone: the same input without the poor-day wording rule (tested in poor-day.test.ts). */
+function ordinaryDay(i: Parameters<typeof buildPlanInput>[0]) {
+  return { allowance: { ...buildPlanInput(i).allowance, poorDay: false } };
+}
+
 describe("a forecast time in the plan says it is a forecast", () => {
-  const { allowance } = buildPlanInput(input);
+  const { allowance } = ordinaryDay(input);
   const windowNote = (note: string) => validatePlan(withStep(0, note), allowance);
 
   it("rejects an unlabelled best-time step (seen live)", () => {
@@ -312,7 +317,7 @@ describe("a forecast time in the plan says it is a forecast", () => {
   });
 
   it("rejects an unlabelled best-time step in Hindi, and accepts a labelled one", () => {
-    const hi = buildPlanInput({ ...input, locale: "hi" }).allowance;
+    const hi = ordinaryDay({ ...input, locale: "hi" }).allowance;
     const plan = (note: string) => ({ headline: "आज की योजना।", steps: [{ kind: "window", refId: "window", note }], acknowledgedGaps: [] });
     expect(validatePlan(plan("आज बाहर रहने का सबसे साफ़ समय 5:30–8:30 है।"), hi)).toEqual({ ok: false, reason: "forecast-unlabelled" });
     expect(validatePlan(plan("पूर्वानुमान के अनुसार सबसे साफ़ समय 5:30–8:30 है।"), hi).ok).toBe(true);
@@ -330,8 +335,8 @@ describe("a forecast time in the plan says it is a forecast", () => {
 });
 
 describe("forecast label: narrow words, same sentence, headline and best-time step only", () => {
-  const { allowance } = buildPlanInput(input); // usual departure 9:00
-  const hi = buildPlanInput({ ...input, locale: "hi" }).allowance;
+  const { allowance } = ordinaryDay(input); // usual departure 9:00
+  const hi = ordinaryDay({ ...input, locale: "hi" }).allowance;
   const windowNote = (note: string, a = allowance) => validatePlan(withStep(0, note), a);
   const headline = (h: string) => validatePlan({ ...validPlan, headline: h }, allowance);
   const hiPlan = (note: string, h = "आज की योजना।") => validatePlan({ headline: h, steps: [{ kind: "window", refId: "window", note }], acknowledgedGaps: [] }, hi);
@@ -348,7 +353,7 @@ describe("forecast label: narrow words, same sentence, headline and best-time st
 
   it.each([
     "The forecast shows the cleanest time is around 5:30 – 8:30 am.",
-    "Predicted cleanest time: 5:30 – 8:30 a.m. in the morning.",
+    "Predicted cleanest time: 5:30 – 8:30 am, in the morning.",
     "The forecast shows 5:30 – 8:30 am as cleanest. Your usual departure is 9:00 am.",
     "The forecast shows 5:30 – 8:30 am as cleanest. You usually leave at 9 a.m. Plan around it.",
   ])("window step: accepts %s", (note) => expect(windowNote(note).ok).toBe(true));

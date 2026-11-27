@@ -136,9 +136,19 @@ export const FORECAST_LABEL_LEXICON: Words = {
 
 /** Parts of the day: in the headline or best-time step they need the label too. */
 export const DAY_PART_LEXICON: Words = {
-  en: ["morning", "afternoon", "evening", "night", "tonight", "midday", "noon"],
-  hi: [hiWord("सुबह|दोपहर|शाम|रात|सवेरे|तड़के")],
+  en: [
+    "morning\\w*", "afternoon\\w*", "evening\\w*", "night\\w*", "tonight", "overnight", "midnight", "midday", "mid-day", "noon\\w*",
+    "dawn\\w*", "dusk", "sunrise", "sunset", "sundown", "daybreak", "daytime", "twilight", "early hours", "small hours",
+  ],
+  hi: [
+    hiWord("सुबह|सुबहें|सुबहों|दोपहर|दोपहरी|शाम|शामें|शामों|रात|रातें|रातों|रातभर|रात्रि|सवेरा|सवेरे|तड़के|भोर|सांझ|सायं|सायंकाल|प्रातः|प्रातःकाल|मध्याह्न|सूर्योदय|सूर्यास्त"),
+  ],
 };
+
+/** Whether a label is present, counting only the words of the plan's own language. */
+export function hasForecastLabel(text: string, locale: Locale): boolean {
+  return COMPILE[locale](FORECAST_LABEL_LEXICON[locale]).test(foldForMatching(text));
+}
 
 function compileAll(words: Words): readonly RegExp[] {
   return (Object.keys(words) as Locale[]).map((l) => COMPILE[l](words[l]));
@@ -164,5 +174,4 @@ export const mentionsNow = matcher(TIME_LEXICON.now);
 export const mentionsForecast = matcher(TIME_LEXICON.forecast);
 export const mentionsLast24Hours = matcher(TIME_LEXICON["last-24-hours"]);
 export const containsNumberWord = matcher(NUMBER_WORD_LEXICON);
-export const hasForecastLabel = matcher(FORECAST_LABEL_LEXICON);
 export const mentionsDayPart = matcher(DAY_PART_LEXICON);

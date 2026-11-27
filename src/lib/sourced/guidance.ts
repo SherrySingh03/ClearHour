@@ -288,6 +288,21 @@ export function categorySignal(snapshot: GroundingSnapshot): CategorySignal {
   return { basis: "unknown" };
 }
 
+/** The measured 24-hour level is Poor or worse. An unknown level is not. */
+export function isPoorOrWorse(signal: CategorySignal): boolean {
+  return signal.basis !== "unknown" && categoryRank(signal.category) >= categoryRank("poor");
+}
+
+/**
+ * Quoted under the best-time headline on poor-or-worse days, when the page may
+ * not present a time as one to be outside. assumptions.ts#window-poor-day-wording
+ */
+export const POOR_DAY_OUTDOOR_ADVICE: GuidanceSource = {
+  citation: "mohfw-air-advisory-2025",
+  locator: "Annexure I, section I (General Population), item 9, PDF p. 20",
+  quote: "Reschedule outdoor activities as per AQI, and remain indoors on days with poor to severe AQI.",
+};
+
 export interface SelectedGuidance {
   readonly item: GuidanceItem;
   /** null = applies regardless of today's air; otherwise the signal that triggered it. */

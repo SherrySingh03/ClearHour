@@ -5,7 +5,7 @@ import { CITATIONS } from "@/lib/grounding/citations";
 import { findCity } from "@/lib/grounding/cities";
 import type { GroundingSnapshot } from "@/lib/grounding/types";
 import type { HouseholdProfile } from "@/lib/profile/types";
-import { categorySignal } from "@/lib/sourced/guidance";
+import { categorySignal, isPoorOrWorse } from "@/lib/sourced/guidance";
 import { walkingGate } from "@/lib/sourced/swaps";
 import { IndoorPanel } from "./IndoorPanel";
 import { LanguageSwitch } from "./LanguageSwitch";
@@ -80,12 +80,13 @@ export function Home({ profile, onEdit }: { profile: HouseholdProfile; onEdit: (
       {load.status === "ready" && (
         <div className="mt-3 space-y-3">
           <MeasuredPanel snapshot={load.snapshot} now={load.now} city={city?.names[locale] ?? ""} />
-          <WindowPanel forecast={load.snapshot.forecast} now={load.now} departureHour={profile.commute.mode === "none" ? undefined : profile.commute.departureHour} />
+          <WindowPanel poorDay={isPoorOrWorse(categorySignal(load.snapshot))} forecast={load.snapshot.forecast} now={load.now} departureHour={profile.commute.mode === "none" ? undefined : profile.commute.departureHour} />
           <PlanPanel
             key={`${locale}:${JSON.stringify(profile)}`}
             profile={profile}
             live={{ reading: load.snapshot.measured.ok, forecast: load.snapshot.forecast.ok }}
             walkingGated={walkingGate(categorySignal(load.snapshot)) !== null}
+            poorDay={isPoorOrWorse(categorySignal(load.snapshot))}
           />
           <IndoorPanel snapshot={load.snapshot} profile={profile} />
           <SwapsPanel profile={profile} snapshot={load.snapshot} />

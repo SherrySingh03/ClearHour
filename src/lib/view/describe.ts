@@ -48,7 +48,11 @@ function categoryShift(c: Comparison, fromCat: string, toCat: string, t: UiStrin
   return c.categoryImproved ? t.window.categoryShift({ from: fromCat, to: toCat }) : null;
 }
 
-export function describeWindow(r: WindowResult, t: UiStrings, f: Formatters): WindowView {
+/**
+ * `poorDay`: the measured 24-hour level is Poor or worse. A named time is then
+ * offered only to someone who has to go out, never as a time to be outside.
+ */
+export function describeWindow(r: WindowResult, t: UiStrings, f: Formatters, poorDay = false): WindowView {
   const range = (s: { startUtc: string; endUtc: string }) => f.timeRange(s.startUtc, s.endUtc);
   switch (r.verdict) {
     case "no-forecast":
@@ -64,7 +68,7 @@ export function describeWindow(r: WindowResult, t: UiStrings, f: Formatters): Wi
       };
     case "cleaner-than-routine":
       return {
-        headline: t.window.cleanerThanRoutine({ best: range(r.best), routine: range(r.routine) }),
+        headline: (poorDay ? t.window.poorCleanerThanRoutine : t.window.cleanerThanRoutine)({ best: range(r.best), routine: range(r.routine) }),
         drop: dropLine(r.comparison, "routine", t, f),
         shift: categoryShift(r.comparison, t.categories[r.routine.indicativeCategory], t.categories[r.best.indicativeCategory], t),
         details: [],
@@ -74,7 +78,7 @@ export function describeWindow(r: WindowResult, t: UiStrings, f: Formatters): Wi
       return { headline: t.window.routineIsFine({ routine: range(r.routine) }), drop: null, shift: null, details: [], showCaveat: true };
     case "clear-best":
       return {
-        headline: t.window.clearBest({ best: range(r.best) }),
+        headline: (poorDay ? t.window.poorClearBest : t.window.clearBest)({ best: range(r.best) }),
         drop: dropLine(r.comparison, "typical", t, f),
         shift: categoryShift(r.comparison, t.categories[r.baseline.indicativeCategory], t.categories[r.best.indicativeCategory], t),
         details: r.routinePassed ? [t.window.routinePassed] : [],

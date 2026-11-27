@@ -108,6 +108,14 @@ export interface UiStrings {
     readonly cleanerThanRoutine: Fn<{ best: string; routine: string }>;
     readonly routineIsFine: Fn<{ routine: string }>;
     readonly clearBest: Fn<{ best: string }>;
+    /** Poor-or-worse days: a time is offered only to someone who has to go out. */
+    readonly poorClearBest: Fn<{ best: string }>;
+    readonly poorCleanerThanRoutine: Fn<{ best: string; routine: string }>;
+    /** The words a plan must keep when it names a time on such a day. */
+    readonly goOutCondition: string;
+    readonly poorAdviceAttribution: string;
+    /** Set for languages that show a translation above the English quote. */
+    readonly poorAdviceTranslation: string | null;
     readonly noClearBest: string;
     readonly noClearBestDetail: string;
     /** Forecast exists, but no full stretch is left in today's outdoor hours. */
@@ -348,6 +356,12 @@ export const en: UiStrings = {
     cleanerThanRoutine: ({ best, routine }) => `Around ${best} looks clearly cleaner than when you usually leave (${routine})`,
     routineIsFine: ({ routine }) => `No other time today looks clearly cleaner than when you usually leave (${routine})`,
     clearBest: ({ best }) => `Cleanest time to be outside today: around ${best}`,
+    poorClearBest: ({ best }) => `If you need to go out, the least polluted time is around ${best}`,
+    poorCleanerThanRoutine: ({ best, routine }) =>
+      `If you need to go out, the least polluted time is around ${best}, clearly cleaner than when you usually leave (${routine})`,
+    goOutCondition: "If you need to go out",
+    poorAdviceAttribution: "Health ministry advisory (MoHFW, 2025), Annexure I, item 9",
+    poorAdviceTranslation: null,
     noClearBest: "No part of today is clearly cleaner than the rest",
     noClearBestDetail: "The cleanest stretch left today isn't clearly better than a typical one, so there's no better time to pick.",
     tooLate: "Too little of today is left to pick a cleaner time",

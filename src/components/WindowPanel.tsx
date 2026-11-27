@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { CITATIONS } from "@/lib/grounding/citations";
 import type { ForecastMissingReason, ForecastSeries, Grounded } from "@/lib/grounding/types";
 import { bestWindow, type Stretch, type WindowResult } from "@/lib/plan/window";
+import { POOR_DAY_OUTDOOR_ADVICE } from "@/lib/sourced/guidance";
 import { describeWindow, todaysPoints } from "@/lib/view/describe";
 import { ForecastChart } from "./ForecastChart";
 import { useLocale } from "./LocaleContext";
@@ -47,7 +48,7 @@ function Shell({ children }: { children: ReactNode }) {
  * under the claim; the full caveat and the "clearly cleaner" rule are one tap
  * away.
  */
-export function WindowPanel({ forecast, now, departureHour }: { forecast: Grounded<ForecastSeries, ForecastMissingReason>; now: Date; departureHour: number | undefined }) {
+export function WindowPanel({ forecast, now, departureHour, poorDay }: { forecast: Grounded<ForecastSeries, ForecastMissingReason>; now: Date; departureHour: number | undefined; poorDay: boolean }) {
   const { t, f } = useLocale();
 
   if (!forecast.ok) {
@@ -62,7 +63,7 @@ export function WindowPanel({ forecast, now, departureHour }: { forecast: Ground
   }
 
   const result = bestWindow({ forecast: forecast.data, now, ...(departureHour === undefined ? {} : { departureHour }) });
-  const view = describeWindow(result, t, f);
+  const view = describeWindow(result, t, f, poorDay);
   const { best, routine } = stretchesOf(result);
   const lines = [view.drop, ...view.details, view.shift].filter((x): x is string => x !== null);
 
@@ -72,6 +73,19 @@ export function WindowPanel({ forecast, now, departureHour }: { forecast: Ground
         {view.headline}
       </h2>
       {view.showCaveat && <p className="mt-2 text-sm font-medium text-model">{t.window.approxNote}</p>}
+      {poorDay && (
+        <figure className="mt-3 border-l-2 border-ink/40 pl-3">
+          {t.window.poorAdviceTranslation && <p className="leading-snug">{t.window.poorAdviceTranslation}</p>}
+          <blockquote lang="en" className="leading-snug before:content-['“'] after:content-['”']">
+            {POOR_DAY_OUTDOOR_ADVICE.quote}
+          </blockquote>
+          <figcaption className="text-xs">
+            <a className="underline underline-offset-2" href={CITATIONS[POOR_DAY_OUTDOOR_ADVICE.citation].url}>
+              {t.window.poorAdviceAttribution}
+            </a>
+          </figcaption>
+        </figure>
+      )}
       {lines.length > 0 && (
         <ul className="mt-3 space-y-1 text-ink/85">
           {lines.map((d) => (

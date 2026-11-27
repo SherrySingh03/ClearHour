@@ -17,7 +17,17 @@ type Load = { status: "idle" } | { status: "loading" } | { status: "failed" } | 
  *
  * Remount (by key) when the language or answers change, which returns it to idle.
  */
-export function PlanPanel({ profile, live, walkingGated }: { profile: HouseholdProfile; live: { reading: boolean; forecast: boolean }; walkingGated: boolean }) {
+export function PlanPanel({
+  profile,
+  live,
+  walkingGated,
+  poorDay,
+}: {
+  profile: HouseholdProfile;
+  live: { reading: boolean; forecast: boolean };
+  walkingGated: boolean;
+  poorDay: boolean;
+}) {
   const { t, f, locale } = useLocale();
   const [load, setLoad] = useState<Load>({ status: "idle" });
 
@@ -58,8 +68,8 @@ export function PlanPanel({ profile, live, walkingGated }: { profile: HouseholdP
             {button(t.plan.retry)}
           </div>
         )}
-        {/* A plan reused from earlier may predate today's poor air: don't show a walking step the page no longer offers. */}
-        {load.status === "ready" && walkingGated && load.data.plan.steps.some((s) => s.refId.endsWith("->walk-cycle")) ? (
+        {/* A reused plan may predate today's poor air: don't show one written without the poor-day wording, or that suggests walking. */}
+        {load.status === "ready" && ((poorDay && !load.data.poorDay) || (walkingGated && load.data.plan.steps.some((s) => s.refId.endsWith("->walk-cycle")))) ? (
           <p className="mt-4">{t.plan.outdated}</p>
         ) : load.status === "ready" && (
           <div className="mt-4">

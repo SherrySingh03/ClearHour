@@ -40,8 +40,10 @@ export interface PlanAllowance {
   readonly tokens: ReadonlySet<string>;
   /** Every value in the packet whatever its kind; tells "invented" from "misused". */
   readonly known: ReadonlySet<string>;
-  /** The household's usual departure hour (0–23): the one clock time that is not a forecast. */
-  readonly departureHour: number | null;
+  /** The household's usual departure as the page writes it: the one clock time that is not a forecast. */
+  readonly departureText: string | null;
+  /** The measured level is Poor or worse: a named time needs the "if you need to go out" condition. */
+  readonly poorDay: boolean;
   /** Proper nouns containing digits (the station name), ignored by the number check. */
   readonly names: readonly string[];
   /**
@@ -76,6 +78,8 @@ export type RefDetail =
 export interface PlanResponse {
   readonly plan: Plan;
   readonly refs: Readonly<Record<string, RefDetail>>;
+  /** Written for a Poor-or-worse day, with the poor-day wording. */
+  readonly poorDay: boolean;
   /** The forecast outlook the writer was given, so its claims can be checked on screen. */
   readonly outlook: readonly OutlookLine[];
 }

@@ -18,14 +18,14 @@ export class PlanUnavailable extends Error {
 }
 
 /**
- * One plan per (city, language, profile, Indian day), reused for three hours and
+ * One plan per (city, language, profile, Indian day, poor-day or not), reused for three hours and
  * shared across server instances (`use cache: remote`), so repeat requests cost
  * no model calls. The reading is deliberately not part of the key.
  *
  * Failures throw, so they are never cached. Their reason is logged HERE: in
  * production an error crossing the cache boundary arrives without its details.
  */
-export async function getPlan(cityId: string, locale: Locale, profile: HouseholdProfile, day: string): Promise<PreparedPlan> {
+export async function getPlan(cityId: string, locale: Locale, profile: HouseholdProfile, day: string, poorAir: boolean): Promise<PreparedPlan> {
   "use cache: remote";
   // Gone after three hours. `expire` must exceed `revalidate`; the one-minute gap
   // keeps an old plan from being served much past its lifetime.
@@ -33,7 +33,7 @@ export async function getPlan(cityId: string, locale: Locale, profile: Household
 
   const started = Date.now();
   const log = (reason: string, detail?: string) =>
-    console.warn("[plan]", JSON.stringify({ reason, ...(detail === undefined ? {} : { detail }), city: cityId, locale, day, ms: Date.now() - started }));
+    console.warn("[plan]", JSON.stringify({ reason, ...(detail === undefined ? {} : { detail }), city: cityId, locale, day, poorAir, ms: Date.now() - started }));
   try {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) throw new PlanUnavailable("no-key");

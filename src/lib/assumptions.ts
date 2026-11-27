@@ -36,6 +36,7 @@ export type AssumptionId =
   | "plan-lifetime"
   | "plan-forecast-label"
   | "walk-cycle-poor-day-gate"
+  | "window-poor-day-wording"
   | "forecast-day-parts"
   | "plan-concurrency"
   | "plan-model-budget"
@@ -203,6 +204,13 @@ export const ASSUMPTIONS: Readonly<Record<AssumptionId, Assumption>> = {
     rationale:
       "MoHFW advises against outdoor walks and exercise on poor-to-severe days (Annexure I item 1; Annexure II item 4(a)-(b)). With no level to check, it is not suggested. The level is the PM2.5 sub-index from one monitor, so a day that is Poor only because of another pollutant is not caught.",
     usedIn: ["src/lib/sourced/swaps.ts", "src/components/SwapsPanel.tsx", "src/components/PlanPanel.tsx"],
+  },
+  "window-poor-day-wording": {
+    id: "window-poor-day-wording",
+    value: "On a measured Poor-or-worse level, a best time is worded 'If you need to go out, the least polluted time is…', with the advisory line quoted beneath",
+    rationale:
+      "MoHFW advises remaining indoors on poor-to-severe days (Annexure I item 9), so the page may not present a time as one to be outside. The plan follows the same rule and names no time in its headline. An unknown level keeps the ordinary wording.",
+    usedIn: ["src/lib/view/describe.ts", "src/components/WindowPanel.tsx", "src/lib/plan/validate.ts"],
   },
   "forecast-day-parts": {
     id: "forecast-day-parts",
