@@ -20,6 +20,8 @@
  *    it is (24-hour AQI as 24-hour and never "now"; the latest reading never
  *    "now" or a forecast). Savings and forecast differences are never given
  *    to the model, so it cannot quote or reverse them: only the UI shows them
+ *  - forecast label: the best-time step, and any headline that quotes a time,
+ *    must say it is a forecast
  *  - language: written in the requested language, with no letters from a
  *    script other than Latin and Devanagari
  */
@@ -43,6 +45,7 @@ export type PlanRejection =
   | "number-word"
   | "unknown-number"
   | "number-role"
+  | "forecast-unlabelled"
   | "wrong-language";
 
 const PlanSchema = z.object({
@@ -134,6 +137,14 @@ export function validatePlan(raw: unknown, a: PlanAllowance): Grounded<Plan, Pla
 
   // Stray text in a third script (seen live: Japanese mid-sentence) is not either language.
   if (texts.some((x) => FOREIGN_LETTER.test(x))) return missing("wrong-language");
+  // A forecast time must call itself a forecast: the best-time step always, and
+  // the headline whenever it quotes a time. (Guidance steps quote their own hours.)
+  const forecastTexts = [
+    ...p.steps.filter((s) => s.kind === "window").map((s) => s.note),
+    ...(numberTokens(p.headline, a.names).some((n) => n.kind === "time") ? [p.headline] : []),
+  ];
+  if (forecastTexts.some((x) => !mentionsForecast(normalise(x)))) return missing("forecast-unlabelled");
+
   const share = devanagariShare(texts.join(" "));
   if (a.locale === "hi" ? share < 0.5 : share > 0.05) return missing("wrong-language");
 

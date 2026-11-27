@@ -66,8 +66,8 @@ export const GUIDANCE: readonly GuidanceItem[] = [
     id: "ventilate-midday",
     trigger: "poor-or-worse",
     text: {
-      en: "On poor-to-severe days, keep outside doors and windows shut in the morning and late evening. If you need to air the house, do it between 12 and 4 pm.",
-      hi: "खराब से गंभीर AQI वाले दिनों में सुबह और देर शाम बाहर के दरवाज़े और खिड़कियाँ बंद रखें। घर में हवा आने देनी हो, तो दोपहर 12 से 4 बजे के बीच खोलें।",
+      en: "On poor-to-severe days, keep outside doors and windows shut in the morning and late evening. If necessary, you may air the house between 12 and 4 pm.",
+      hi: "खराब से गंभीर AQI वाले दिनों में सुबह और देर शाम बाहर के दरवाज़े और खिड़कियाँ बंद रखें। ज़रूरत हो तो दोपहर 12 से 4 बजे के बीच घर में हवा आने दे सकते हैं।",
     },
     sources: [
       {
@@ -109,8 +109,8 @@ export const GUIDANCE: readonly GuidanceItem[] = [
     id: "no-coils-incense",
     trigger: "always",
     text: {
-      en: "Don't burn mosquito coils or incense sticks in closed rooms, and avoid an indoor havan when air quality is poor.",
-      hi: "बंद कमरों में मच्छर भगाने वाली कॉइल या अगरबत्ती न जलाएँ, और हवा खराब हो तो घर के अंदर हवन न करें।",
+      en: "Avoid burning mosquito coils and incense sticks in closed premises, and avoid an indoor havan when air quality is poor.",
+      hi: "बंद परिसर में मच्छर भगाने वाली कॉइल और अगरबत्ती जलाने से बचें, और हवा खराब हो तो घर के अंदर हवन करने से बचें।",
     },
     sources: [
       {
@@ -129,18 +129,18 @@ export const GUIDANCE: readonly GuidanceItem[] = [
     id: "no-angithi",
     trigger: "always",
     text: {
-      en: "Don't heat a closed room with an angithi (wood or charcoal brazier): the advisory warns this may be fatal because of carbon monoxide.",
-      hi: "बंद कमरे को अंगीठी (लकड़ी या कोयले) से गर्म न करें: सलाह के अनुसार कार्बन मोनोऑक्साइड के कारण यह जानलेवा हो सकता है।",
+      en: "Avoid burning wood or charcoal in an angithi (brazier) during winters in closed, confined spaces: the advisory warns this may be fatal because of carbon monoxide and built-up CO₂.",
+      hi: "सर्दियों में बंद और तंग जगह में अंगीठी में लकड़ी या कोयला जलाने से बचें: सलाह के अनुसार कार्बन मोनोऑक्साइड और जमा हुई CO₂ के कारण यह जानलेवा हो सकता है।",
     },
     writerText: {
-      en: "Don't heat a closed room with an angithi (wood or charcoal brazier).",
-      hi: "बंद कमरे को अंगीठी (लकड़ी या कोयले) से गर्म न करें।",
+      en: "Avoid burning wood or charcoal in an angithi (brazier) during winters in closed, confined spaces.",
+      hi: "सर्दियों में बंद और तंग जगह में अंगीठी में लकड़ी या कोयला जलाने से बचें।",
     },
     sources: [
       {
         citation: MOHFW,
         locator: "Annexure I, section I (General Population), item 3, PDF p. 20",
-        quote: "Avoid burning of wood/ charcoal in 'Anghiti' during winters, in closed and confined condition which may be fatal due to CO …",
+        quote: "Avoid burning of wood/ charcoal in 'Anghiti' during winters, in closed and confined condition which may be fatal due to CO and built-up CO₂",
       },
     ],
   },
@@ -148,8 +148,8 @@ export const GUIDANCE: readonly GuidanceItem[] = [
     id: "wet-mopping",
     trigger: "always",
     text: {
-      en: "Wet-mop floors instead of sweeping or vacuuming. If you do use a vacuum cleaner, use one with a HEPA filter.",
-      hi: "झाड़ू लगाने या वैक्यूम करने के बजाय गीला पोंछा लगाएँ। वैक्यूम क्लीनर इस्तेमाल करें तो HEPA फ़िल्टर वाला लें।",
+      en: "Practise wet mopping instead of sweeping or vacuum cleaning inside the home. If you choose to use a vacuum cleaner, use one with a HEPA filter.",
+      hi: "घर के अंदर झाड़ू लगाने या वैक्यूम करने के बजाय गीला पोंछा लगाएँ। वैक्यूम क्लीनर इस्तेमाल करना चाहें तो HEPA फ़िल्टर वाला लें।",
     },
     sources: [
       {
@@ -165,12 +165,12 @@ export const GUIDANCE: readonly GuidanceItem[] = [
     trigger: "poor-or-worse",
     requires: { purifier: true },
     text: {
-      en: "On poor-to-severe days, the health ministry says an air purifier may help. If you use one, follow the maker's instructions and clean or replace filters as directed.",
-      hi: "स्वास्थ्य मंत्रालय के अनुसार खराब से गंभीर AQI वाले दिनों में एयर प्यूरीफ़ायर मददगार हो सकता है। इस्तेमाल करें तो निर्माता के निर्देश मानें और फ़िल्टर बताए अनुसार साफ़ करें या बदलें।",
+      en: "On poor-to-severe days, the health ministry says an air purifier may help. If you use one, follow the maker's guidelines, and replace and clean filters as instructed.",
+      hi: "स्वास्थ्य मंत्रालय के अनुसार खराब से गंभीर AQI वाले दिनों में एयर प्यूरीफ़ायर मददगार हो सकता है। इस्तेमाल करें तो निर्माता के निर्देश मानें, और फ़िल्टर बताए अनुसार बदलें और साफ़ करें।",
     },
     writerText: {
-      en: "On poor-to-severe days, an air purifier may help. If you use one, follow the maker's instructions and clean or replace filters as directed.",
-      hi: "खराब से गंभीर AQI वाले दिनों में एयर प्यूरीफ़ायर मददगार हो सकता है। इस्तेमाल करें तो निर्माता के निर्देश मानें और फ़िल्टर बताए अनुसार साफ़ करें या बदलें।",
+      en: "On poor-to-severe days, an air purifier may help. If you use one, follow the maker's guidelines, and replace and clean filters as instructed.",
+      hi: "खराब से गंभीर AQI वाले दिनों में एयर प्यूरीफ़ायर मददगार हो सकता है। इस्तेमाल करें तो निर्माता के निर्देश मानें, और फ़िल्टर बताए अनुसार बदलें और साफ़ करें।",
     },
     sources: [
       {
@@ -190,8 +190,8 @@ export const GUIDANCE: readonly GuidanceItem[] = [
     trigger: "poor-or-worse",
     requires: { purifier: false },
     text: {
-      en: "If you are thinking about an air purifier (the advisory lists it as optional): choose one whose clean air delivery rate (CADR) suits the room size, and avoid models that produce ozone.",
-      hi: "अगर आप एयर प्यूरीफ़ायर लेने की सोच रहे हैं (सलाह में इसे वैकल्पिक बताया गया है): ऐसा चुनें जिसका क्लीन एयर डिलीवरी रेट (CADR) कमरे के आकार के हिसाब से हो, और ओज़ोन बनाने वाले मॉडल से बचें।",
+      en: "If you are thinking about an air purifier (the advisory lists it as optional): to filter particles, choose one whose clean air delivery rate (CADR) is large enough for the room or area where you will use it, and avoid one that works by generating ozone.",
+      hi: "अगर आप एयर प्यूरीफ़ायर लेने की सोच रहे हैं (सलाह में इसे वैकल्पिक बताया गया है): कण छानने के लिए ऐसा चुनें जिसका क्लीन एयर डिलीवरी रेट (CADR) उस कमरे या जगह के लिए काफ़ी बड़ा हो जहाँ आप उसे चलाएँगे, और ओज़ोन बनाकर काम करने वाले प्यूरीफ़ायर से बचें।",
     },
     sources: [
       {
@@ -212,8 +212,8 @@ export const GUIDANCE: readonly GuidanceItem[] = [
     trigger: "always",
     requires: { cookingFuel: ["biomass", "kerosene"] },
     text: {
-      en: "Cook with gas (LPG or piped gas) or electricity if you can. If you cook with wood, dung or other biomass, use a clean cookstove.",
-      hi: "हो सके तो गैस (LPG या पाइप वाली गैस) या बिजली से खाना बनाएँ। लकड़ी, उपले या दूसरे बायोमास से खाना बनाते हैं तो साफ़ (उन्नत) चूल्हा इस्तेमाल करें।",
+      en: "Avoid burning biomass such as wood, coal, animal dung and kerosene. Use clean smokeless fuels (gas or electricity) for cooking and heating. If you use biomass, use a clean cookstove.",
+      hi: "लकड़ी, कोयला, गोबर और मिट्टी का तेल जैसे बायोमास ईंधन जलाने से बचें। खाना पकाने और घर गर्म करने के लिए साफ़, बिना धुएँ वाले ईंधन (गैस या बिजली) इस्तेमाल करें। बायोमास इस्तेमाल करते हैं तो साफ़ चूल्हा इस्तेमाल करें।",
     },
     sources: [
       {
@@ -225,7 +225,7 @@ export const GUIDANCE: readonly GuidanceItem[] = [
       {
         citation: "who-household-air-2025",
         locator: "Fact sheet, section 'Guidance'",
-        quote: "recommendations discouraging use of kerosene and recommending against use of unprocessed coal",
+        quote: "Guidelines for indoor air quality: household fuel combustion, which offer practical evidence-based guidance on what fuels and technologies used in the home can be considered clean, including recommendations discouraging use of kerosene and recommending against use of unprocessed coal",
       },
     ],
   },
@@ -250,11 +250,11 @@ export const GUIDANCE: readonly GuidanceItem[] = [
     trigger: "poor-or-worse",
     requires: { childrenOrElderly: true },
     text: {
-      en: "On poor-to-severe days, the health ministry advises young children and elderly people to limit going outdoors as far as possible.",
-      hi: "खराब से गंभीर AQI वाले दिनों में स्वास्थ्य मंत्रालय की सलाह है कि छोटे बच्चे और बुज़ुर्ग जहाँ तक हो सके बाहर कम निकलें।",
+      en: "On poor-to-severe days, the health ministry says people at higher risk, such as pregnant women, young children and the elderly, should restrict going outdoors as far as possible.",
+      hi: "स्वास्थ्य मंत्रालय के अनुसार खराब से गंभीर AQI वाले दिनों में ज़्यादा जोखिम वाले लोग, जैसे गर्भवती महिलाएँ, छोटे बच्चे और बुज़ुर्ग, जहाँ तक हो सके बाहर कम निकलें।",
     },
     writerText: {
-      en: "On poor-to-severe days, young children and elderly people should limit going outdoors as far as possible.",
+      en: "On poor-to-severe days, young children and elderly people should restrict going outdoors as far as possible.",
       hi: "खराब से गंभीर AQI वाले दिनों में छोटे बच्चे और बुज़ुर्ग जहाँ तक हो सके बाहर कम निकलें।",
     },
     sources: [

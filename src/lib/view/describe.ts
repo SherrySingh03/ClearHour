@@ -30,7 +30,9 @@ export interface WindowView {
   readonly headline: string;
   /** The predicted difference, with what it is measured from. Shown by the UI only, never given to the plan writer. */
   readonly drop: string | null;
-  /** Everything else; contains no pollution amounts. */
+  /** The best stretch's indicative category against the other. UI only: the writer must not apply it to a longer period. */
+  readonly shift: string | null;
+  /** Everything else; contains no pollution amounts or categories. */
   readonly details: readonly string[];
   /** Always true when a window is presented: the 3-hour caveat travels with it. */
   readonly showCaveat: boolean;
@@ -42,20 +44,21 @@ function dropLine(c: Comparison, against: "routine" | "typical", t: UiStrings, f
   return against === "routine" ? t.window.dropVsRoutine(p) : t.window.dropVsTypical(p);
 }
 
-function categoryLines(c: Comparison, fromCat: string, toCat: string, t: UiStrings): string[] {
-  return c.categoryImproved ? [t.window.categoryShift({ from: fromCat, to: toCat })] : [];
+function categoryShift(c: Comparison, fromCat: string, toCat: string, t: UiStrings): string | null {
+  return c.categoryImproved ? t.window.categoryShift({ from: fromCat, to: toCat }) : null;
 }
 
 export function describeWindow(r: WindowResult, t: UiStrings, f: Formatters): WindowView {
   const range = (s: { startUtc: string; endUtc: string }) => f.timeRange(s.startUtc, s.endUtc);
   switch (r.verdict) {
     case "no-forecast":
-      return { headline: t.window.unavailable, drop: null, details: [], showCaveat: false };
+      return { headline: t.window.unavailable, drop: null, shift: null, details: [], showCaveat: false };
     case "insufficient-forecast":
       // The forecast exists (the curve is drawn); there is just no full stretch left in today's outdoor hours.
       return {
         headline: t.window.tooLate,
         drop: null,
+        shift: null,
         details: [t.window.tooLateDetail({ from: f.clockHour(OUTDOOR_START_HOUR), to: f.clockHour(OUTDOOR_END_HOUR) })],
         showCaveat: false,
       };
@@ -63,25 +66,25 @@ export function describeWindow(r: WindowResult, t: UiStrings, f: Formatters): Wi
       return {
         headline: t.window.cleanerThanRoutine({ best: range(r.best), routine: range(r.routine) }),
         drop: dropLine(r.comparison, "routine", t, f),
-        details: categoryLines(r.comparison, t.categories[r.routine.indicativeCategory], t.categories[r.best.indicativeCategory], t),
+        shift: categoryShift(r.comparison, t.categories[r.routine.indicativeCategory], t.categories[r.best.indicativeCategory], t),
+        details: [],
         showCaveat: true,
       };
     case "routine-is-fine":
-      return { headline: t.window.routineIsFine({ routine: range(r.routine) }), drop: null, details: [], showCaveat: true };
+      return { headline: t.window.routineIsFine({ routine: range(r.routine) }), drop: null, shift: null, details: [], showCaveat: true };
     case "clear-best":
       return {
         headline: t.window.clearBest({ best: range(r.best) }),
         drop: dropLine(r.comparison, "typical", t, f),
-        details: [
-          ...(r.routinePassed ? [t.window.routinePassed] : []),
-          ...categoryLines(r.comparison, t.categories[r.baseline.indicativeCategory], t.categories[r.best.indicativeCategory], t),
-        ],
+        shift: categoryShift(r.comparison, t.categories[r.baseline.indicativeCategory], t.categories[r.best.indicativeCategory], t),
+        details: r.routinePassed ? [t.window.routinePassed] : [],
         showCaveat: true,
       };
     case "no-clear-best":
       return {
         headline: t.window.noClearBest,
         drop: null,
+        shift: null,
         details: [...(r.routinePassed ? [t.window.routinePassed] : []), t.window.noClearBestDetail],
         showCaveat: true,
       };

@@ -61,7 +61,7 @@ describe.each(LOCALES)("window sentences (%s)", (locale) => {
   });
 
   it("no forecast: an explicit message, no caveat (no window is presented)", () => {
-    expect(describeWindow({ verdict: "no-forecast" }, t, f)).toEqual({ headline: t.window.unavailable, drop: null, details: [], showCaveat: false });
+    expect(describeWindow({ verdict: "no-forecast" }, t, f)).toEqual({ headline: t.window.unavailable, drop: null, shift: null, details: [], showCaveat: false });
   });
 
   it("late evening (forecast present, no full stretch left): says it's too late today, never 'no forecast'", () => {

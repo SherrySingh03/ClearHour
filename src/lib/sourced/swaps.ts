@@ -64,6 +64,11 @@ export interface Swap {
   readonly why: readonly SourcedReason[];
   /** The target may not be available (no metro/rail/piped gas nearby); the UI says "if available". */
   readonly conditional: boolean;
+  /**
+   * No source recommends this swap: `why` is background on the fuels, and the
+   * UI says the swap rests on the CO2 figure alone.
+   */
+  readonly co2Only: boolean;
 }
 
 export type WithheldReason =
@@ -110,7 +115,7 @@ const WHY_CLEAN_COOKING: readonly SourcedReason[] = [
   {
     citation: "who-household-air-2025",
     locator: "Fact sheet, section 'Guidance'",
-    quote: "recommendations discouraging use of kerosene and recommending against use of unprocessed coal",
+    quote: "Guidelines for indoor air quality: household fuel combustion, which offer practical evidence-based guidance on what fuels and technologies used in the home can be considered clean, including recommendations discouraging use of kerosene and recommending against use of unprocessed coal",
   },
 ];
 
@@ -187,6 +192,7 @@ function commuteSwaps(mode: CommuteMode, oneWayKm: number): SwapResult {
       assumptions: ["vehicle-representative-category", "private-vehicle-solo", "commute-round-trip"],
       why: WHY_PUBLIC_TRANSPORT,
       conditional: t !== "walk-cycle",
+      co2Only: false,
     });
   }
   return { swaps, withheld };
@@ -211,8 +217,9 @@ function cookingSwaps(fuel: CookingFuel): SwapResult {
             id: "cooking:lpg->png",
             saving: percentLess("lpg-combustion", "natural-gas-combustion"),
             assumptions: ["equal-stove-efficiency"],
-            why: WHY_GAS_IS_CLEAN,
+            why: WHY_GAS_IS_CLEAN, // lists LPG and natural gas alike as clean: not a case for switching
             conditional: true, // only where piped gas is available
+            co2Only: true,
           },
         ],
         withheld: [],
@@ -226,6 +233,7 @@ function cookingSwaps(fuel: CookingFuel): SwapResult {
             assumptions: ["equal-stove-efficiency"],
             why: WHY_CLEAN_COOKING,
             conditional: false,
+            co2Only: false,
           },
         ],
         withheld: [],

@@ -64,6 +64,7 @@ export function WindowPanel({ forecast, now, departureHour }: { forecast: Ground
   const result = bestWindow({ forecast: forecast.data, now, ...(departureHour === undefined ? {} : { departureHour }) });
   const view = describeWindow(result, t, f);
   const { best, routine } = stretchesOf(result);
+  const lines = [view.drop, ...view.details, view.shift].filter((x): x is string => x !== null);
 
   return (
     <Shell>
@@ -71,9 +72,9 @@ export function WindowPanel({ forecast, now, departureHour }: { forecast: Ground
         {view.headline}
       </h2>
       {view.showCaveat && <p className="mt-2 text-sm font-medium text-model">{t.window.approxNote}</p>}
-      {(view.drop !== null || view.details.length > 0) && (
+      {lines.length > 0 && (
         <ul className="mt-3 space-y-1 text-ink/85">
-          {[...(view.drop === null ? [] : [view.drop]), ...view.details].map((d) => (
+          {lines.map((d) => (
             <li key={d}>{d}</li>
           ))}
         </ul>

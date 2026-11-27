@@ -205,7 +205,7 @@ export const ASSUMPTIONS: Readonly<Record<AssumptionId, Assumption>> = {
     id: "saving-lower-bound",
     value: "Commute savings shown as 'at least', rounded down to 2 significant figures, with their conditions",
     rationale:
-      "The figure is a floor only for a solo traveller in a vehicle no smaller than the one assumed (and, for petrol cars, not a hybrid, whose source row is lower). Rounding to nearest could push 'at least' above the computed value, so it rounds down. It rests on 2015 factors, which the evidence panel says.",
+      "The figure is a floor only for a solo traveller in a vehicle emitting at least as much as the one assumed (and, for petrol cars, not a hybrid, whose source row is lower). Rounding to nearest could push 'at least' above the computed value, so it rounds down. It rests on 2015 factors, which the evidence panel says.",
     usedIn: ["src/lib/view/describe.ts", "src/components/SwapsPanel.tsx"],
   },
   "plan-timeframe-binding": {

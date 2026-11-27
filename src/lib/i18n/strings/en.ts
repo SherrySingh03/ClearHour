@@ -181,6 +181,8 @@ export interface UiStrings {
     readonly dataAge: string;
     readonly busScope: string;
     readonly whyTitle: string;
+    readonly aboutFuelsTitle: string;
+    readonly co2OnlyNote: string;
     readonly withheldTitle: string;
     readonly withheld: Readonly<Record<WithheldReason, string>>;
   };
@@ -380,10 +382,10 @@ export const en: UiStrings = {
   },
   swaps: {
     targets: {
-      bus: "Take the bus",
-      "suburban-rail": "Take the local train",
-      metro: "Take the metro",
-      "walk-cycle": "Walk or cycle",
+      bus: "Take the bus when you can",
+      "suburban-rail": "Take the local train when you can",
+      metro: "Take the metro when you can",
+      "walk-cycle": "Walk or cycle when you can",
       png: "Switch to piped gas (PNG)",
       lpg: "Switch to LPG",
     },
@@ -433,7 +435,7 @@ export const en: UiStrings = {
     sourceRow: "As printed in the source",
     assumedTitle: "What we assumed",
     assumed: {
-      "vehicle-representative-category": "We counted the smallest vehicle of your type in the source table. A bigger one would save more.",
+      "vehicle-representative-category": "We counted the lowest-emitting non-hybrid vehicle of your type in the source table. Others would save more.",
       "private-vehicle-solo": "You travel alone. Sharing a vehicle means each person saves less.",
       "commute-round-trip": "You travel your distance there and back on a working day.",
       "equal-stove-efficiency": "Both stoves turn the same share of their fuel into useful heat.",
@@ -442,12 +444,14 @@ export const en: UiStrings = {
     dataAge: "The transport figures date from 2015, the latest India-specific set we found. A newer vehicle may differ.",
     busScope: "The bus figure is for ordinary city buses, not bus rapid transit or intercity buses.",
     whyTitle: "Why this is suggested",
+    aboutFuelsTitle: "What the source says about these fuels",
+    co2OnlyNote: "This swap rests on the CO₂ figure alone. The source counts both LPG and natural gas as clean fuels.",
     withheldTitle: "No figure for these",
     withheld: {
       "no-verified-metro-factor": "We haven't found a verified per-passenger figure for the metro, so we don't show a number.",
       "no-per-passenger-auto-factor": "The source gives auto-rickshaw CO₂ per vehicle, not per passenger, so there's no fair comparison to show.",
       "biomass-co2-not-comparable":
-        "CO₂ from wood, dung and crop waste is counted differently in international rules, and stoves vary too much to compare. The sources suggest cleaner fuel because of the air inside the home.",
+        "CO₂ from wood, dung and crop waste is counted differently in international rules, and we have no sourced stove-efficiency figures to compare with. The sources suggest cleaner fuel because of the air inside the home.",
     },
   },
   plan: {

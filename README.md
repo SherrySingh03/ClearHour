@@ -117,6 +117,7 @@ Structured JSON only: a headline, 1–5 steps (each pointing at an id from the p
 | **Pollution numbers** | Hourly forecast values are never sent. Every number in the plan must be in the packet **written as the same kind of thing**: a clock time stays a time, a distance keeps km, a duration keeps hours, a concentration keeps µg/m³. The only number allowed without a unit is the 24-hour AQI. So the "30" of "8:30" cannot become "keep it under 30". A sentence quoting the AQI must say it covers 24 hours and must not say "now"; the latest reading may not be called current or a forecast. Spelled-out quantities and unusual numerals are rejected. |
 | **Emission factors and savings** | Never sent. Any number with kg or % fails, because the packet contains none. Only the app states savings, with their conditions. |
 | **Health thresholds and health claims** | No thresholds or CPCB health statements are sent. A per-language word list (health, medical, safety, exposure, risk, caution and more; `lexicon.ts`) rejects any match. CPCB's statement is shown verbatim by the app. |
+| **Unlabelled forecast times** | The best-time step, and any headline that quotes a time, must say it is a forecast. The best stretch's category is not sent, so it cannot stand for a longer period. |
 | Invented items | Step ids must come from the packet, without repeats; no "window" step without a forecast. |
 | Hiding missing data | The plan must list exactly the packet's gap codes. |
 | Links, wrong language (including any letters from a third script), oversize text | Rejected. |
@@ -198,6 +199,10 @@ Every number below was checked on 2026-11-25 against the publisher's own documen
 | Indoor measures | MoHFW, *Advisory on Air Pollution and Health* (Nov 2025) | Annexures I–III, PDF pp. 20–25 |
 | Purifier sizing (CADR) | US EPA, *Guide to Air Cleaners in the Home*, 2nd ed. (2018) | p. 3 |
 | Clean household fuels | WHO, *Household air pollution* fact sheet (16 Dec 2025) | "Key facts", "Guidance" |
+
+### Advice wording audit (2026-11-27)
+
+Every advice and swap string (200: advice text in both languages, quotes, page locators, swap and indoor labels, CPCB statements, factor rows) was re-read against its source document, the scanned advisory from its page images. Corrected: verbs stronger or weaker than the source ("don't" for "avoid"; an added "if you can" on clean fuels; "clean or replace" for "replace and clean"), narrowed or widened scope ("closed rooms" for "closed premises"; pregnant women left out; "heating" left out), a dropped "during winters", three quotes cut off from the words they depend on, and two labels claiming more than the data. Where the plan writer may not use a word (pregnancy), its copy covers only the groups the app asks about.
 
 ### Sourcing log: what was checked and not used
 

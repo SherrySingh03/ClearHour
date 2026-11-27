@@ -105,6 +105,7 @@ export function buildPlanInput({ snapshot, profile, locale, now }: PlanInput) {
       saving: describeSaving(s, t, f),
       onlyIfAvailable: s.conditional,
       why: s.why,
+      co2Only: s.co2Only,
       factors: [s.saving.from, s.saving.to].map((term) => ({
         factorId: term.factorId,
         value: term.value,

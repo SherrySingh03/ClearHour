@@ -22,6 +22,15 @@ describe("prompt rules that protect cited advice", () => {
     expect(SYSTEM_PROMPT).toContain("It is not advice");
   });
 
+  it("keeps a three-hour stretch from standing for a longer period", () => {
+    expect(SYSTEM_PROMPT).toContain("The best stretch is only three hours");
+    expect(SYSTEM_PROMPT).toContain("call it a forecast in that same note");
+  });
+
+  it("quotes the advice examples as the app now words them", () => {
+    expect(SYSTEM_PROMPT).not.toMatch(/don't burn mosquito|closed rooms/i);
+  });
+
   it("does not push the model away from its source", () => {
     expect(SYSTEM_PROMPT).not.toMatch(/Do not copy|only restates/i);
     expect(SYSTEM_PROMPT).toContain("Staying close to the item's own wording is fine");

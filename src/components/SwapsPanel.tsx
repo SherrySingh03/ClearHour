@@ -66,7 +66,8 @@ function Working({ swap }: { swap: Swap }) {
       </div>
 
       <div>
-        <p className="font-medium">{s.whyTitle}</p>
+        <p className="font-medium">{swap.co2Only ? s.aboutFuelsTitle : s.whyTitle}</p>
+        {swap.co2Only && <p>{s.co2OnlyNote}</p>}
         <Quotes items={swap.why} />
       </div>
     </Evidence>

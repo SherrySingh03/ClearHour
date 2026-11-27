@@ -298,3 +298,33 @@ describe("no third script", () => {
     expect(check("The latest reading was 45 μg/m3 at the station.").ok).toBe(true);
   });
 });
+
+describe("a forecast time in the plan says it is a forecast", () => {
+  const { allowance } = buildPlanInput(input);
+  const windowNote = (note: string) => validatePlan(withStep(0, note), allowance);
+
+  it("rejects an unlabelled best-time step (seen live)", () => {
+    expect(windowNote("Cleanest time to be outside today: around 5:30 – 8:30 am. Your usual departure is 9:00 am.")).toEqual({ ok: false, reason: "forecast-unlabelled" });
+  });
+
+  it.each(["The forecast shows the cleanest time is around 5:30 – 8:30 am.", "Predicted cleanest time: 5:30 – 8:30 am."])("accepts: %s", (note) => {
+    expect(windowNote(note).ok).toBe(true);
+  });
+
+  it("rejects an unlabelled best-time step in Hindi, and accepts a labelled one", () => {
+    const hi = buildPlanInput({ ...input, locale: "hi" }).allowance;
+    const plan = (note: string) => ({ headline: "आज की योजना।", steps: [{ kind: "window", refId: "window", note }], acknowledgedGaps: [] });
+    expect(validatePlan(plan("आज बाहर रहने का सबसे साफ़ समय 5:30–8:30 है।"), hi)).toEqual({ ok: false, reason: "forecast-unlabelled" });
+    expect(validatePlan(plan("पूर्वानुमान के अनुसार सबसे साफ़ समय 5:30–8:30 है।"), hi).ok).toBe(true);
+  });
+
+  it("also applies to a headline that quotes a time, but not to a guidance step's own hours", () => {
+    expect(validatePlan({ ...validPlan, headline: "Go out around 5:30 am today." }, allowance)).toEqual({ ok: false, reason: "forecast-unlabelled" });
+    expect(validatePlan(withStep(1, "If necessary, you may air the house between 12 and 4 pm."), allowance).ok).toBe(true);
+  });
+
+  it("never gives the writer the best stretch's category", () => {
+    const { packet } = buildPlanInput(input);
+    expect(JSON.stringify(packet.forecast)).not.toMatch(/instead of/);
+  });
+});

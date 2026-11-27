@@ -113,6 +113,7 @@ export function PlanPanel({ profile, live }: { profile: HouseholdProfile; live: 
                         ))}
                         {/* These quotes are from other documents than the figure's link above, so each names its own. */}
                         <Evidence summary={t.plan.sourceSays}>
+                          {ref.co2Only && <p className="text-ink">{t.swapsSection.co2OnlyNote}</p>}
                           <p className="font-medium text-ink">{t.indoor.originalWording}</p>
                           <Quotes items={ref.why} />
                         </Evidence>
