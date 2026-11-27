@@ -24,7 +24,8 @@ describe("prompt rules that protect cited advice", () => {
 
   it("keeps a three-hour stretch from standing for a longer period", () => {
     expect(SYSTEM_PROMPT).toContain("The best stretch is only three hours");
-    expect(SYSTEM_PROMPT).toContain("call it a forecast in that same note");
+    expect(SYSTEM_PROMPT).toContain('must itself contain the word "forecast" or "predicted"');
+    expect(SYSTEM_PROMPT).toContain("never call the measured 24-hour level a forecast");
   });
 
   it("quotes the advice examples as the app now words them", () => {

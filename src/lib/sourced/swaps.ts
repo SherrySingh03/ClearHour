@@ -11,6 +11,8 @@ import type { AssumptionId } from "../assumptions";
 import type { CitationId } from "../grounding/citations";
 import type { CommuteMode, CookingFuel, HouseholdProfile } from "../profile/types";
 import { factor, type FactorId } from "./emissionFactors";
+import { categoryRank } from "../grounding/aqi/cpcb";
+import type { CategorySignal } from "./guidance";
 
 /** Clearhour judgment call: assumptions.ts#walk-cycle-max-distance. */
 export const WALK_CYCLE_MAX_ONE_WAY_KM = 3;
@@ -65,10 +67,20 @@ export interface Swap {
   /** The target may not be available (no metro/rail/piped gas nearby); the UI says "if available". */
   readonly conditional: boolean;
   /**
-   * No source recommends this swap: `why` is background on the fuels, and the
+   * Set when no source recommends this swap: `why` is then background, and the
    * UI says the swap rests on the CO2 figure alone.
    */
-  readonly co2Only: boolean;
+  readonly co2Only: Co2OnlyTopic | null;
+}
+
+export type Co2OnlyTopic = "fuels" | "walking";
+
+/** A swap not offered today because a source advises against it in today's air. */
+export interface GatedSwap {
+  readonly id: SwapId;
+  readonly reason: "poor-air-day" | "air-level-unknown";
+  /** The advice that gates it, verbatim. */
+  readonly why: readonly SourcedReason[];
 }
 
 export type WithheldReason =
@@ -85,6 +97,7 @@ export interface WithheldSwap {
 export interface SwapResult {
   readonly swaps: readonly Swap[];
   readonly withheld: readonly WithheldSwap[];
+  readonly gated: readonly GatedSwap[];
 }
 
 // ---------------------------------------------------------------------------
@@ -129,6 +142,30 @@ const WHY_GAS_IS_CLEAN: readonly SourcedReason[] = [
   },
 ];
 
+/** The health ministry's advice against walking and exercise outdoors on poor-to-severe days. */
+const WHY_NO_WALKING_ON_POOR_DAYS: readonly SourcedReason[] = [
+  {
+    citation: "mohfw-air-advisory-2025",
+    locator: "Annexure II (Social Media Messages), item 4 (lead-in) and 4(a)–(b), PDF p. 22",
+    quote:
+      "On days of poor to severe plus air pollution (AQI>200) … avoid outdoor morning & late evening walk … avoid jogging, running or other exertional physical activities",
+  },
+  {
+    citation: "mohfw-air-advisory-2025",
+    locator: "Annexure I, section I (General Population), item 1, PDF p. 20",
+    quote: "Avoid outdoor morning and late evening walk, run, jog and physical exercise. … (Days with poor to severe AQI)",
+  },
+];
+
+/**
+ * Walking and cycling are not suggested on poor-or-worse days, nor when there
+ * is no air level to check. assumptions.ts#walk-cycle-poor-day-gate
+ */
+export function walkingGate(signal: CategorySignal): GatedSwap["reason"] | null {
+  if (signal.basis === "unknown") return "air-level-unknown";
+  return categoryRank(signal.category) >= categoryRank("poor") ? "poor-air-day" : null;
+}
+
 // ---------------------------------------------------------------------------
 // Commute
 // ---------------------------------------------------------------------------
@@ -152,14 +189,22 @@ function term(id: FactorId | "none"): FactorTerm {
   return { factorId: id, value: f.value, unit: f.unit };
 }
 
-function commuteSwaps(mode: CommuteMode, oneWayKm: number): SwapResult {
-  if (!(oneWayKm > 0)) return { swaps: [], withheld: [] };
+function commuteSwaps(mode: CommuteMode, oneWayKm: number, signal: CategorySignal): SwapResult {
+  if (!(oneWayKm > 0)) return { swaps: [], withheld: [], gated: [] };
   const targets: TransportTarget[] = ["bus", "suburban-rail", "metro"];
-  if (oneWayKm <= WALK_CYCLE_MAX_ONE_WAY_KM) targets.push("walk-cycle");
+  const gated: GatedSwap[] = [];
+  // Only a commuter who would otherwise be offered it is told why it is missing.
+  const couldWalk = oneWayKm <= WALK_CYCLE_MAX_ONE_WAY_KM && (mode === "auto-rickshaw" || mode in PRIVATE_VEHICLE_FACTOR);
+  if (couldWalk) {
+    const reason = walkingGate(signal);
+    if (reason === null) targets.push("walk-cycle");
+    else gated.push({ id: `commute:${mode}->walk-cycle`, reason, why: WHY_NO_WALKING_ON_POOR_DAYS });
+  }
 
   if (mode === "auto-rickshaw") {
     return {
       swaps: [],
+      gated,
       withheld: targets.map((t) => ({
         id: `commute:${mode}->${t}` as const,
         reason: "no-per-passenger-auto-factor",
@@ -170,7 +215,7 @@ function commuteSwaps(mode: CommuteMode, oneWayKm: number): SwapResult {
 
   const fromId = PRIVATE_VEHICLE_FACTOR[mode];
   // Bus, rail, metro, walking, cycling or no commute: already low-emission.
-  if (!fromId) return { swaps: [], withheld: [] };
+  if (!fromId) return { swaps: [], withheld: [], gated };
 
   const km = 2 * oneWayKm; // assumptions.ts#commute-round-trip
   const from = term(fromId);
@@ -190,12 +235,14 @@ function commuteSwaps(mode: CommuteMode, oneWayKm: number): SwapResult {
       id,
       saving: { kind: "computed", quantity: "kgCO2-per-working-day", value, from, to, km },
       assumptions: ["vehicle-representative-category", "private-vehicle-solo", "commute-round-trip"],
-      why: WHY_PUBLIC_TRANSPORT,
+      // No source recommends walking as a swap on an ordinary day (the public
+      // transport advice doesn't mention it, and CPCB's is for very poor days).
+      why: t === "walk-cycle" ? WHY_NO_WALKING_ON_POOR_DAYS : WHY_PUBLIC_TRANSPORT,
       conditional: t !== "walk-cycle",
-      co2Only: false,
+      co2Only: t === "walk-cycle" ? "walking" : null,
     });
   }
-  return { swaps, withheld };
+  return { swaps, withheld, gated };
 }
 
 // ---------------------------------------------------------------------------
@@ -208,7 +255,7 @@ function percentLess(fromId: FactorId, toId: FactorId): ComputedSaving {
   return { kind: "computed", quantity: "percent-less-CO2-per-unit-heat", value: ((from.value - to.value) / from.value) * 100, from, to };
 }
 
-function cookingSwaps(fuel: CookingFuel): SwapResult {
+function cookingSwaps(fuel: CookingFuel): Omit<SwapResult, "gated"> {
   switch (fuel) {
     case "lpg":
       return {
@@ -219,7 +266,7 @@ function cookingSwaps(fuel: CookingFuel): SwapResult {
             assumptions: ["equal-stove-efficiency"],
             why: WHY_GAS_IS_CLEAN, // lists LPG and natural gas alike as clean: not a case for switching
             conditional: true, // only where piped gas is available
-            co2Only: true,
+            co2Only: "fuels",
           },
         ],
         withheld: [],
@@ -233,7 +280,7 @@ function cookingSwaps(fuel: CookingFuel): SwapResult {
             assumptions: ["equal-stove-efficiency"],
             why: WHY_CLEAN_COOKING,
             conditional: false,
-            co2Only: false,
+            co2Only: null,
           },
         ],
         withheld: [],
@@ -248,8 +295,8 @@ function cookingSwaps(fuel: CookingFuel): SwapResult {
   }
 }
 
-export function swapsFor(profile: HouseholdProfile): SwapResult {
-  const c = commuteSwaps(profile.commute.mode, profile.commute.oneWayKm);
+export function swapsFor(profile: HouseholdProfile, signal: CategorySignal): SwapResult {
+  const c = commuteSwaps(profile.commute.mode, profile.commute.oneWayKm, signal);
   const k = cookingSwaps(profile.cookingFuel);
-  return { swaps: [...c.swaps, ...k.swaps], withheld: [...c.withheld, ...k.withheld] };
+  return { swaps: [...c.swaps, ...k.swaps], withheld: [...c.withheld, ...k.withheld], gated: c.gated };
 }

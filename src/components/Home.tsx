@@ -5,6 +5,8 @@ import { CITATIONS } from "@/lib/grounding/citations";
 import { findCity } from "@/lib/grounding/cities";
 import type { GroundingSnapshot } from "@/lib/grounding/types";
 import type { HouseholdProfile } from "@/lib/profile/types";
+import { categorySignal } from "@/lib/sourced/guidance";
+import { walkingGate } from "@/lib/sourced/swaps";
 import { IndoorPanel } from "./IndoorPanel";
 import { LanguageSwitch } from "./LanguageSwitch";
 import { useLocale } from "./LocaleContext";
@@ -83,9 +85,10 @@ export function Home({ profile, onEdit }: { profile: HouseholdProfile; onEdit: (
             key={`${locale}:${JSON.stringify(profile)}`}
             profile={profile}
             live={{ reading: load.snapshot.measured.ok, forecast: load.snapshot.forecast.ok }}
+            walkingGated={walkingGate(categorySignal(load.snapshot)) !== null}
           />
           <IndoorPanel snapshot={load.snapshot} profile={profile} />
-          <SwapsPanel profile={profile} />
+          <SwapsPanel profile={profile} snapshot={load.snapshot} />
         </div>
       )}
 

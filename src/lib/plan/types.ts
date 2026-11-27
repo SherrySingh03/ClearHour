@@ -40,6 +40,8 @@ export interface PlanAllowance {
   readonly tokens: ReadonlySet<string>;
   /** Every value in the packet whatever its kind; tells "invented" from "misused". */
   readonly known: ReadonlySet<string>;
+  /** The household's usual departure hour (0–23): the one clock time that is not a forecast. */
+  readonly departureHour: number | null;
   /** Proper nouns containing digits (the station name), ignored by the number check. */
   readonly names: readonly string[];
   /**
@@ -64,8 +66,8 @@ export type RefDetail =
       readonly saving: string;
       /** The alternative may not exist on this route (metro, local train, piped gas). */
       readonly onlyIfAvailable: boolean;
-      /** True when no source recommends the swap: it rests on the CO2 figure alone. */
-      readonly co2Only: boolean;
+      /** Set when no source recommends the swap: it rests on the CO2 figure alone. */
+      readonly co2Only: "fuels" | "walking" | null;
       /** Published passages behind the swap, verbatim. */
       readonly why: readonly { readonly citation: CitationId; readonly locator: string; readonly quote: string }[];
       readonly factors: readonly { readonly factorId: string; readonly value: number; readonly unit: string; readonly citation: CitationId | null }[];

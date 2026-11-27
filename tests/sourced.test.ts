@@ -6,6 +6,9 @@ import { EMISSION_FACTORS } from "@/lib/sourced/emissionFactors";
 import { GUIDANCE, selectGuidance } from "@/lib/sourced/guidance";
 import { swapsFor, type Swap } from "@/lib/sourced/swaps";
 
+/** Swaps on an ordinary (Moderate) day; the poor-day gate is tested in walking.test.ts. */
+const swapsOn = (p: Parameters<typeof swapsFor>[0]) => swapsFor(p, { basis: "measured-24h", category: "moderate" });
+
 const profile = (over: Partial<HouseholdProfile> = {}, commute: Partial<HouseholdProfile["commute"]> = {}): HouseholdProfile => ({
   cityId: "delhi",
   cookingFuel: "png",
@@ -52,7 +55,7 @@ describe("sourced data integrity", () => {
 
 describe("commute swaps", () => {
   it("petrol car, 10 km each way: bus and suburban rail with the arithmetic shown; metro withheld", () => {
-    const { swaps, withheld } = swapsFor(profile({}, { mode: "car-petrol", oneWayKm: 10 }));
+    const { swaps, withheld } = swapsOn(profile({}, { mode: "car-petrol", oneWayKm: 10 }));
     const bus = byId(swaps, "commute:car-petrol->bus");
     expect(bus?.saving).toMatchObject({ quantity: "kgCO2-per-working-day", km: 20, from: { factorId: "car-petrol", value: 0.111 }, to: { factorId: "bus-intracity", value: 0.015161 } });
     expect(bus?.saving.value).toBeCloseTo((0.111 - 0.015161) * 20, 10);
@@ -63,7 +66,7 @@ describe("commute swaps", () => {
   });
 
   it("offers walking or cycling only for short trips (≤ 3 km), with zero fuel", () => {
-    const { swaps } = swapsFor(profile({}, { mode: "two-wheeler", oneWayKm: 2.5 }));
+    const { swaps } = swapsOn(profile({}, { mode: "two-wheeler", oneWayKm: 2.5 }));
     const walk = byId(swaps, "commute:two-wheeler->walk-cycle");
     expect(walk?.saving.value).toBeCloseTo(0.0319 * 5, 10);
     expect(walk?.conditional).toBe(false);
@@ -71,38 +74,38 @@ describe("commute swaps", () => {
   });
 
   it("withholds every auto-rickshaw swap: no per-passenger factor", () => {
-    const { swaps, withheld } = swapsFor(profile({}, { mode: "auto-rickshaw", oneWayKm: 6 }));
+    const { swaps, withheld } = swapsOn(profile({}, { mode: "auto-rickshaw", oneWayKm: 6 }));
     expect(swaps.filter((s) => s.id.startsWith("commute:"))).toHaveLength(0);
     expect(withheld.every((w) => w.reason === "no-per-passenger-auto-factor")).toBe(true);
   });
 
   it.each(["bus", "metro", "suburban-rail", "walk-cycle", "none"] as const)("suggests nothing for %s", (mode) => {
-    const { swaps, withheld } = swapsFor(profile({}, { mode }));
+    const { swaps, withheld } = swapsOn(profile({}, { mode }));
     expect([...swaps, ...withheld].filter((s) => s.id.startsWith("commute:"))).toHaveLength(0);
   });
 
   it("does nothing with a missing or zero distance", () => {
-    expect(swapsFor(profile({}, { mode: "car-diesel", oneWayKm: 0 })).swaps).toHaveLength(0);
+    expect(swapsOn(profile({}, { mode: "car-diesel", oneWayKm: 0 })).swaps).toHaveLength(0);
   });
 });
 
 describe("cooking swaps", () => {
   it("LPG → piped gas: % less CO2 per unit of heat from the IPCC factors", () => {
-    const s = byId(swapsFor(profile({ cookingFuel: "lpg" })).swaps, "cooking:lpg->png");
+    const s = byId(swapsOn(profile({ cookingFuel: "lpg" })).swaps, "cooking:lpg->png");
     expect(s?.saving.value).toBeCloseTo(((63_100 - 56_100) / 63_100) * 100, 10);
     expect(s?.conditional).toBe(true);
     expect(s?.assumptions).toEqual(["equal-stove-efficiency"]);
   });
 
   it("kerosene → LPG", () => {
-    expect(byId(swapsFor(profile({ cookingFuel: "kerosene" })).swaps, "cooking:kerosene->lpg")?.saving.value).toBeCloseTo(
+    expect(byId(swapsOn(profile({ cookingFuel: "kerosene" })).swaps, "cooking:kerosene->lpg")?.saving.value).toBeCloseTo(
       ((71_900 - 63_100) / 71_900) * 100,
       10,
     );
   });
 
   it("biomass → LPG is withheld (no comparable CO2 figure) but keeps its sourced reason", () => {
-    const { swaps, withheld } = swapsFor(profile({ cookingFuel: "biomass" }));
+    const { swaps, withheld } = swapsOn(profile({ cookingFuel: "biomass" }));
     expect(swaps.filter((s) => s.id.startsWith("cooking:"))).toHaveLength(0);
     expect(withheld).toContainEqual(expect.objectContaining({ id: "cooking:biomass->lpg", reason: "biomass-co2-not-comparable" }));
   });
@@ -141,7 +144,7 @@ describe("indoor guidance selection", () => {
 
 describe("assumption registry", () => {
   it("every swap assumption is registered", () => {
-    const all = swapsFor(profile({ cookingFuel: "lpg" }, { mode: "car-cng", oneWayKm: 2 })).swaps.flatMap((s) => s.assumptions);
+    const all = swapsOn(profile({ cookingFuel: "lpg" }, { mode: "car-cng", oneWayKm: 2 })).swaps.flatMap((s) => s.assumptions);
     for (const a of all) expect(ASSUMPTIONS[a]).toBeDefined();
   });
 });

@@ -124,6 +124,22 @@ export const NUMBER_WORD_LEXICON: Words = {
   ],
 };
 
+/**
+ * The only words that label a forecast time or part of the day. Deliberately
+ * narrower than the forecast concept above: "expected", "model" or "hope" do
+ * not tell a reader that a time is a prediction.
+ */
+export const FORECAST_LABEL_LEXICON: Words = {
+  en: ["forecast", "predicted"],
+  hi: ["पूर्वानुमान"],
+};
+
+/** Parts of the day: in the headline or best-time step they need the label too. */
+export const DAY_PART_LEXICON: Words = {
+  en: ["morning", "afternoon", "evening", "night", "tonight", "midday", "noon"],
+  hi: [hiWord("सुबह|दोपहर|शाम|रात|सवेरे|तड़के")],
+};
+
 function compileAll(words: Words): readonly RegExp[] {
   return (Object.keys(words) as Locale[]).map((l) => COMPILE[l](words[l]));
 }
@@ -148,3 +164,5 @@ export const mentionsNow = matcher(TIME_LEXICON.now);
 export const mentionsForecast = matcher(TIME_LEXICON.forecast);
 export const mentionsLast24Hours = matcher(TIME_LEXICON["last-24-hours"]);
 export const containsNumberWord = matcher(NUMBER_WORD_LEXICON);
+export const hasForecastLabel = matcher(FORECAST_LABEL_LEXICON);
+export const mentionsDayPart = matcher(DAY_PART_LEXICON);

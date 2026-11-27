@@ -117,7 +117,7 @@ Structured JSON only: a headline, 1–5 steps (each pointing at an id from the p
 | **Pollution numbers** | Hourly forecast values are never sent. Every number in the plan must be in the packet **written as the same kind of thing**: a clock time stays a time, a distance keeps km, a duration keeps hours, a concentration keeps µg/m³. The only number allowed without a unit is the 24-hour AQI. So the "30" of "8:30" cannot become "keep it under 30". A sentence quoting the AQI must say it covers 24 hours and must not say "now"; the latest reading may not be called current or a forecast. Spelled-out quantities and unusual numerals are rejected. |
 | **Emission factors and savings** | Never sent. Any number with kg or % fails, because the packet contains none. Only the app states savings, with their conditions. |
 | **Health thresholds and health claims** | No thresholds or CPCB health statements are sent. A per-language word list (health, medical, safety, exposure, risk, caution and more; `lexicon.ts`) rejects any match. CPCB's statement is shown verbatim by the app. |
-| **Unlabelled forecast times** | The best-time step, and any headline that quotes a time, must say it is a forecast. The best stretch's category is not sent, so it cannot stand for a longer period. |
+| **Unlabelled forecast times** | The best-time step must say "forecast" or "predicted" (पूर्वानुमान). In it and in the headline, every sentence naming a clock time or part of the day must carry that label itself; the household's own departure time is exempt. The best stretch's category is not sent, so it cannot stand for a longer period. |
 | Invented items | Step ids must come from the packet, without repeats; no "window" step without a forecast. |
 | Hiding missing data | The plan must list exactly the packet's gap codes. |
 | Links, wrong language (including any letters from a third script), oversize text | Rejected. |
@@ -204,6 +204,16 @@ Every number below was checked on 2026-11-25 against the publisher's own documen
 
 Every advice and swap string (200: advice text in both languages, quotes, page locators, swap and indoor labels, CPCB statements, factor rows) was re-read against its source document, the scanned advisory from its page images. Corrected: verbs stronger or weaker than the source ("don't" for "avoid"; an added "if you can" on clean fuels; "clean or replace" for "replace and clean"), narrowed or widened scope ("closed rooms" for "closed premises"; pregnant women left out; "heating" left out), a dropped "during winters", two quotes cut off from the words they depend on, and two labels claiming more than the data. Where the plan writer may not use a word (pregnancy), its copy covers only the groups the app asks about.
 
+The Hindi advice and labels were checked against the English text by the AI coding assistant used to build the app. **No native Hindi speaker has reviewed them.**
+
+### Neighbouring advice left out, on purpose
+
+A scope decision, not an oversight. The app carries a limited set of advice items; these sit next to them in the advisory and are **not** shown as advice:
+
+- **Avoiding ozone-generating purifiers, for households that already own one.** The warning is shown only to households choosing a purifier.
+- **Consulting an expert** on a purifier's suitability, positioning, technology and capacity.
+- **Avoiding outdoor exercise** on poor-to-severe days. The advisory's line on walks and exercise is used only to stop the app suggesting walking or cycling then, and is quoted there.
+
 ### Sourcing log: what was checked and not used
 
 - **CPCB breakpoints** were first cited to a PeerJ 2020 reprint because `https://cpcb.nic.in` failed. CPCB has moved to `cpcb.gov.in`, where the 2014 report and the official calculator were fetched and read. Reading the calculator also showed that our interpolation had been about 1 AQI point off. It now matches CPCB's formulas exactly (tests replay the calculator's own worked example).
@@ -232,6 +242,7 @@ These are **Clearhour's own judgment calls, not published standards**. The sourc
 | `private-vehicle-solo` | One person per car/two-wheeler trip | Factors are per vehicle-km. |
 | `commute-round-trip` | 2 × one-way, per working day | Onboarding asks for one-way distance. |
 | `walk-cycle-max-distance` | ≤ 3 km one way | Suggested only where plausibly practical. |
+| `walk-cycle-poor-day-gate` | No walking/cycling suggestion on Poor-or-worse days or without an air level | MoHFW advises against outdoor walks and exercise on poor-to-severe days. Uses the one-monitor PM2.5 level, so a day Poor only from another pollutant is not caught. |
 | `equal-stove-efficiency` | Same useful heat per unit of fuel energy | Needed to compare gas and kerosene CO₂. Biomass excluded. |
 | `window-stretch-length` | 3 hourly points | CAMS resolves 3-hour steps. Never a single hour. |
 | `window-outdoor-hours` | 05:00–22:00 local | When people realistically go out. |
@@ -246,6 +257,7 @@ These are **Clearhour's own judgment calls, not published standards**. The sourc
 | `forecast-day-parts` | Morning 05–12, afternoon 12–17, evening 17–22 | Computed forecast words the plan may use; indicative categories, shown on the plan card. |
 | `saving-lower-bound` | "At least", rounded down to 2 significant figures, with conditions | A floor only if the commuter travels alone (and a petrol car isn't a hybrid). Rounding to nearest could overstate it. |
 | `plan-timeframe-binding` | Each number keeps its kind; measured numbers are quoted with their timeframe, per sentence | The 24-hour AQI needs "24 hours" and no "now"; the latest reading is never "now" or a forecast. Savings and forecast differences are never sent to Gemini, so it can't quote or reverse them; only the UI states them. |
+| `plan-forecast-label` | "forecast"/"predicted" (पूर्वानुमान) in each sentence of the headline or best-time step naming a time or part of day | An unlabelled forecast time reads like a measurement. Advice steps and the household's departure time are exempt. |
 | `plan-health-vocabulary` | One concept table (health, medical, safety, exposure, risk, caution) with words for every UI language | Any match rejects the whole plan. A new language fails to compile, and fails tests, until every concept has words for it. |
 
 ## Languages

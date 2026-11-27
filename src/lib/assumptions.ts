@@ -34,6 +34,8 @@ export type AssumptionId =
   | "window-materially-cleaner"
   | "window-routine-stretch"
   | "plan-lifetime"
+  | "plan-forecast-label"
+  | "walk-cycle-poor-day-gate"
   | "forecast-day-parts"
   | "plan-concurrency"
   | "plan-model-budget"
@@ -187,6 +189,20 @@ export const ASSUMPTIONS: Readonly<Record<AssumptionId, Assumption>> = {
     rationale:
       "The free tier allows few model calls and testing time is unknown, so identical requests share one plan for three hours (set by the project owner). The staleness is disclosed beside the plan. The day is in the key because a plan talks about today. The forecast box on the page stays live.",
     usedIn: ["src/lib/plan/clock.ts", "src/lib/plan/server.ts", "src/components/PlanPanel.tsx"],
+  },
+  "plan-forecast-label": {
+    id: "plan-forecast-label",
+    value: "In the headline and best-time step, each sentence naming a clock time or part of day must say 'forecast' or 'predicted' (पूर्वानुमान)",
+    rationale:
+      "An unlabelled forecast time reads like a measurement. Looser words ('expected', 'model') don't tell a reader that. Cited advice steps are exempt (their hours are the source's), as is the household's own departure time.",
+    usedIn: ["src/lib/plan/validate.ts", "src/lib/plan/lexicon.ts"],
+  },
+  "walk-cycle-poor-day-gate": {
+    id: "walk-cycle-poor-day-gate",
+    value: "No walking or cycling suggestion when the 24-hour PM2.5 level is Poor or worse, or unavailable",
+    rationale:
+      "MoHFW advises against outdoor walks and exercise on poor-to-severe days (Annexure I item 1; Annexure II item 4(a)-(b)). With no level to check, it is not suggested. The level is the PM2.5 sub-index from one monitor, so a day that is Poor only because of another pollutant is not caught.",
+    usedIn: ["src/lib/sourced/swaps.ts", "src/components/SwapsPanel.tsx", "src/components/PlanPanel.tsx"],
   },
   "forecast-day-parts": {
     id: "forecast-day-parts",

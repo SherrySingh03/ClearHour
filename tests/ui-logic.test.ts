@@ -6,6 +6,9 @@ import { parseProfile } from "@/lib/profile/storage";
 import { swapsFor } from "@/lib/sourced/swaps";
 import { describeAge, describeSaving, describeWindow, floorTo2Significant, uniqueCitations } from "@/lib/view/describe";
 
+/** Swaps on an ordinary (Moderate) day; the poor-day gate is tested in walking.test.ts. */
+const swapsOn = (p: Parameters<typeof swapsFor>[0]) => swapsFor(p, { basis: "measured-24h", category: "moderate" });
+
 const EARLY = new Date("2026-11-24T22:30:00Z"); // 04:00 IST
 
 function series(pm25At: (localHour: number) => number | null): ForecastSeries {
@@ -155,7 +158,7 @@ describe.each(LOCALES)("swap figures (%s)", (locale) => {
     hasChildrenOrElderly: false,
     hasAirPurifier: false,
   });
-  const bus = (mode: "two-wheeler" | "car-petrol" | "car-diesel", km: number) => swapsFor(profileWith(mode, km)).swaps.find((s) => s.id === `commute:${mode}->bus`)!;
+  const bus = (mode: "two-wheeler" | "car-petrol" | "car-diesel", km: number) => swapsOn(profileWith(mode, km)).swaps.find((s) => s.id === `commute:${mode}->bus`)!;
 
   it("'at least' never exceeds the computed saving (0.268 kg shows as 0.26, not 0.3)", () => {
     const swap = bus("two-wheeler", 8);
@@ -169,7 +172,7 @@ describe.each(LOCALES)("swap figures (%s)", (locale) => {
   });
 
   it("the stove figure states its assumption", () => {
-    const png = swapsFor(profileWith("car-diesel", 1)).swaps.find((s) => s.id === "cooking:lpg->png")!;
+    const png = swapsOn(profileWith("car-diesel", 1)).swaps.find((s) => s.id === "cooking:lpg->png")!;
     expect(describeSaving(png, t, f)).toBe(t.swaps.percentLess({ pct: "11" }));
   });
 });

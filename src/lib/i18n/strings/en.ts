@@ -181,8 +181,11 @@ export interface UiStrings {
     readonly dataAge: string;
     readonly busScope: string;
     readonly whyTitle: string;
-    readonly aboutFuelsTitle: string;
-    readonly co2OnlyNote: string;
+    readonly aboutTitle: string;
+    readonly co2OnlyNotes: Readonly<Record<"fuels" | "walking", string>>;
+    readonly gatedTitle: string;
+    readonly gatedPoor: Fn<{ category: string }>;
+    readonly gatedUnknown: string;
     readonly withheldTitle: string;
     readonly withheld: Readonly<Record<WithheldReason, string>>;
   };
@@ -197,6 +200,8 @@ export interface UiStrings {
     readonly preparedAt: Fn<{ time: string; ago: string; reading: string | null }>;
     readonly outlookUsed: Fn<{ items: readonly { part: string; category: string }[] }>;
     readonly sourceSays: string;
+    /** A reused plan suggests something the page no longer offers. */
+    readonly outdated: string;
     readonly retry: string;
     readonly gapsIntro: string;
     readonly seeForecast: string;
@@ -444,8 +449,17 @@ export const en: UiStrings = {
     dataAge: "The transport figures date from 2015, the latest India-specific set we found. A newer vehicle may differ.",
     busScope: "The bus figure is for ordinary city buses, not bus rapid transit or intercity buses.",
     whyTitle: "Why this is suggested",
-    aboutFuelsTitle: "What the source says about these fuels",
-    co2OnlyNote: "This swap rests on the CO₂ figure alone. The source counts both LPG and natural gas as clean fuels.",
+    aboutTitle: "What the source says about this",
+    co2OnlyNotes: {
+      fuels: "This swap rests on the CO₂ figure alone. The source counts both LPG and natural gas as clean fuels.",
+      walking:
+        "This swap rests on the CO₂ figure alone. The health ministry advises against outdoor walks and exercise on poor-to-severe days, so it isn't suggested then.",
+    },
+    gatedTitle: "Walking or cycling: not suggested today",
+    gatedPoor: ({ category }) =>
+      `Fine dust over the last 24 hours was at the ${category} level. The health ministry advises against outdoor walks and exercise on poor-to-severe days.`,
+    gatedUnknown:
+      "There's no 24-hour air level to check right now. The health ministry advises against outdoor walks and exercise on poor-to-severe days.",
     withheldTitle: "No figure for these",
     withheld: {
       "no-verified-metro-factor": "We haven't found a verified per-passenger figure for the metro, so we don't show a number.",
@@ -475,6 +489,7 @@ export const en: UiStrings = {
     gapsIntro: "This plan is missing:",
     seeForecast: "See the prediction above",
     sourceSays: "What the source says",
+    outdated: "This plan was written before today's air level changed, so it isn't shown. The readings and advice on this page are up to date.",
     source: ({ title }) => `Source: ${title}`,
   },
   errors: {

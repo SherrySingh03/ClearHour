@@ -20,15 +20,16 @@
  *    it is (24-hour AQI as 24-hour and never "now"; the latest reading never
  *    "now" or a forecast). Savings and forecast differences are never given
  *    to the model, so it cannot quote or reverse them: only the UI shows them
- *  - forecast label: the best-time step, and any headline that quotes a time,
- *    must say it is a forecast
+ *  - forecast label: the best-time step must say "forecast" or "predicted"
+ *    (पूर्वानुमान), and in it and the headline every sentence naming a clock time
+ *    or part of the day must carry that label itself
  *  - language: written in the requested language, with no letters from a
  *    script other than Latin and Devanagari
  */
 
 import { z } from "zod";
 import { missing, ok, type Grounded } from "../grounding/types";
-import { containsNumberWord, healthConcept, mentionsForecast, mentionsLast24Hours, mentionsNow } from "./lexicon";
+import { containsNumberWord, hasForecastLabel, healthConcept, mentionsDayPart, mentionsForecast, mentionsLast24Hours, mentionsNow } from "./lexicon";
 import { hasUnsupportedNumerals, normalise, numberTokens, sentences } from "./numbers";
 import type { NumberRole, Plan, PlanAllowance } from "./types";
 
@@ -90,6 +91,28 @@ function misboundNumber(text: string, a: PlanAllowance): string | null {
  */
 const FOREIGN_LETTER = /(?![\p{Script=Latin}\p{Script=Devanagari}\u00B5\u03BC])\p{L}/u;
 
+/** "a.m." → "am", so it doesn't end a sentence; a final one keeps its full stop. */
+const plainMeridiem = (text: string) => text.replace(/\b([AaPp])\.[Mm]\.(?=\s+\p{Lu})/gu, "$1m.").replace(/\b([AaPp])\.[Mm]\./g, "$1m");
+
+/** The household's own departure time as a plan would write it, with any day-part word before it. */
+function departurePattern(hour: number): RegExp {
+  const h = hour % 12 || 12;
+  return new RegExp(`(?:(?:सुबह|दोपहर|शाम|रात)\\s*)?(?<![\\d:])${h}(?::00\\s*(?:am|pm|बजे)?|\\s*(?:am|pm|बजे))`, "gi");
+}
+
+/**
+ * True if any sentence names a clock time or a part of the day without saying,
+ * in that same sentence, that it is a forecast. The household's own departure
+ * time is not a forecast and is set aside first.
+ */
+function hasUnlabelledForecastSentence(text: string, a: PlanAllowance): boolean {
+  return sentences(plainMeridiem(normalise(text))).some((sentence) => {
+    const rest = a.departureHour === null ? sentence : sentence.replace(departurePattern(a.departureHour), " ");
+    const claimsATime = mentionsDayPart(rest) || numberTokens(rest, a.names).some((n) => n.kind === "time");
+    return claimsATime && !hasForecastLabel(sentence);
+  });
+}
+
 /** Share of letters that are Devanagari. */
 function devanagariShare(text: string): number {
   const letters = text.match(/\p{L}/gu) ?? [];
@@ -137,13 +160,11 @@ export function validatePlan(raw: unknown, a: PlanAllowance): Grounded<Plan, Pla
 
   // Stray text in a third script (seen live: Japanese mid-sentence) is not either language.
   if (texts.some((x) => FOREIGN_LETTER.test(x))) return missing("wrong-language");
-  // A forecast time must call itself a forecast: the best-time step always, and
-  // the headline whenever it quotes a time. (Guidance steps quote their own hours.)
-  const forecastTexts = [
-    ...p.steps.filter((s) => s.kind === "window").map((s) => s.note),
-    ...(numberTokens(p.headline, a.names).some((n) => n.kind === "time") ? [p.headline] : []),
-  ];
-  if (forecastTexts.some((x) => !mentionsForecast(normalise(x)))) return missing("forecast-unlabelled");
+  // Headline and best-time step only: cited advice legitimately names mornings
+  // and evenings. assumptions.ts#plan-forecast-label
+  const windowNotes = p.steps.filter((x) => x.kind === "window").map((x) => x.note);
+  if (windowNotes.some((x) => !hasForecastLabel(x))) return missing("forecast-unlabelled");
+  if ([p.headline, ...windowNotes].some((x) => hasUnlabelledForecastSentence(x, a))) return missing("forecast-unlabelled");
 
   const share = devanagariShare(texts.join(" "));
   if (a.locale === "hi" ? share < 0.5 : share > 0.05) return missing("wrong-language");

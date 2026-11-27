@@ -49,7 +49,7 @@ describe("validator accepts a grounded plan", () => {
 
   it("allows pollutant names with digits (PM2.5, CO₂) and Hindi city names", async () => {
     const hiPlan = {
-      headline: "दिल्ली में आज सुबह जल्दी निकलना बेहतर रहेगा।",
+      headline: "दिल्ली में आज जल्दी निकलना बेहतर रहेगा।",
       steps: [{ kind: "window", refId: "window", note: "पूर्वानुमान के अनुसार PM2.5 सुबह कम रहेगा, इसलिए जल्दी निकलें।" }],
       acknowledgedGaps: [],
     };
@@ -212,7 +212,7 @@ describe("numbers are bound to what they are (timeframe), not just to a unit", (
 
   it("Hindi: rejects अभी / वर्तमान with the AQI, accepts 24 घंटे", () => {
     const hi = buildPlanInput({ ...input, locale: "hi" }).allowance;
-    const hiCheck = (note: string) => validatePlan({ ...withStep(2, note), headline: "दिल्ली में आज सुबह जल्दी निकलें।", steps: [{ kind: "swap", refId: "commute:car-petrol->bus", note }] }, hi);
+    const hiCheck = (note: string) => validatePlan({ ...withStep(2, note), headline: "दिल्ली में आज जल्दी निकलें।", steps: [{ kind: "swap", refId: "commute:car-petrol->bus", note }] }, hi);
     expect(hiCheck("दिल्ली का AQI अभी 220 है।")).toMatchObject({ ok: false, reason: "number-role" });
     expect(hiCheck("दिल्ली की वर्तमान वायु गुणवत्ता २२० है।")).toMatchObject({ ok: false, reason: "number-role" });
     expect(hiCheck("पिछले 24 घंटों में दिल्ली का AQI 220 रहा।").ok).toBe(true);
@@ -326,5 +326,54 @@ describe("a forecast time in the plan says it is a forecast", () => {
   it("never gives the writer the best stretch's category", () => {
     const { packet } = buildPlanInput(input);
     expect(JSON.stringify(packet.forecast)).not.toMatch(/instead of/);
+  });
+});
+
+describe("forecast label: narrow words, same sentence, headline and best-time step only", () => {
+  const { allowance } = buildPlanInput(input); // usual departure 9:00
+  const hi = buildPlanInput({ ...input, locale: "hi" }).allowance;
+  const windowNote = (note: string, a = allowance) => validatePlan(withStep(0, note), a);
+  const headline = (h: string) => validatePlan({ ...validPlan, headline: h }, allowance);
+  const hiPlan = (note: string, h = "आज की योजना।") => validatePlan({ headline: h, steps: [{ kind: "window", refId: "window", note }], acknowledgedGaps: [] }, hi);
+  const rejected = { ok: false, reason: "forecast-unlabelled" };
+
+  it.each([
+    ["'expected' is not a label", "The cleanest time is expected around 5:30 – 8:30 am."],
+    ["'model' is not a label", "The model points to 5:30 – 8:30 am."],
+    ["the label sits in another sentence", "The forecast looks poor later. Leave at 5:30 am."],
+    ["a part of the day without it", "The forecast is in. Go out in the evening."],
+    ["no label at all", "Cleanest time to be outside today: around 5:30 – 8:30 am."],
+    ["a departure sentence cannot carry a second, forecast time", "The forecast helps. Your usual departure is 9:00 am, but 5:30 am is cleaner."],
+  ])("window step: rejects when %s", (_, note) => expect(windowNote(note)).toEqual(rejected));
+
+  it.each([
+    "The forecast shows the cleanest time is around 5:30 – 8:30 am.",
+    "Predicted cleanest time: 5:30 – 8:30 a.m. in the morning.",
+    "The forecast shows 5:30 – 8:30 am as cleanest. Your usual departure is 9:00 am.",
+    "The forecast shows 5:30 – 8:30 am as cleanest. You usually leave at 9 a.m. Plan around it.",
+  ])("window step: accepts %s", (note) => expect(windowNote(note).ok).toBe(true));
+
+  it.each(["A Poor day, then a very poor evening.", "Go out around 5:30 am today.", "A forecast day. A clean morning."])("headline: rejects %s", (h) =>
+    expect(headline(h)).toEqual(rejected),
+  );
+
+  it.each(["A Poor day with a very poor evening forecast.", "A Poor day.", "The forecast has a cleaner stretch around 5:30 – 8:30 am."])("headline: accepts %s", (h) =>
+    expect(headline(h).ok).toBe(true),
+  );
+
+  it("leaves cited advice steps alone", () => {
+    expect(validatePlan(withStep(1, "Keep outside doors and windows shut in the morning and late evening."), allowance).ok).toBe(true);
+  });
+
+  it("Hindi: only पूर्वानुमान counts", () => {
+    expect(hiPlan("सबसे साफ़ समय 5:30–8:30 का अनुमान है।")).toEqual(rejected);
+    expect(hiPlan("सुबह साफ़ रहने की उम्मीद है।")).toEqual(rejected);
+    expect(hiPlan("पूर्वानुमान के अनुसार सबसे साफ़ समय सुबह 5:30–8:30 है। आप आमतौर पर सुबह 9:00 बजे निकलते हैं।").ok).toBe(true);
+    expect(hiPlan("पूर्वानुमान के अनुसार सुबह साफ़ रहेगी।", "आज शाम हवा खराब रहेगी।")).toEqual(rejected);
+    expect(hiPlan("पूर्वानुमान के अनुसार सुबह साफ़ रहेगी।", "शाम का पूर्वानुमान बहुत खराब है।").ok).toBe(true);
+  });
+
+  it("does not mistake शामिल (include) for शाम (evening)", () => {
+    expect(hiPlan("पूर्वानुमान देखें।", "आज की योजना में रसोई शामिल है।").ok).toBe(true);
   });
 });

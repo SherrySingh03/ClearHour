@@ -93,8 +93,9 @@ export function buildPlanInput({ snapshot, profile, locale, now }: PlanInput) {
   // Sourced guidance and computed swaps. Amounts (savings, forecast differences)
   // are deliberately left out of the packet: the UI shows them with their
   // conditions, and a number the model never saw fails the unknown-number check.
-  const guidance = selectGuidance(profile, categorySignal(snapshot));
-  const { swaps } = swapsFor(profile);
+  const signal = categorySignal(snapshot);
+  const guidance = selectGuidance(profile, signal);
+  const { swaps } = swapsFor(profile, signal);
   const refs: Record<string, RefDetail> = {};
   if (windowAvailable) refs.window = { kind: "window" };
   for (const g of guidance) refs[g.item.id] = { kind: "guidance", text: g.item.text[locale], sources: g.item.sources };
@@ -154,6 +155,7 @@ export function buildPlanInput({ snapshot, profile, locale, now }: PlanInput) {
     tokens,
     known,
     names,
+    departureHour: commuting ? (profile.commute.departureHour ?? null) : null,
     bindings,
     guidanceIds: new Set(guidance.map((g) => g.item.id)),
     swapIds: new Set(swaps.map((s) => s.id)),

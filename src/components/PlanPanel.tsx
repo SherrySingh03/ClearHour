@@ -17,7 +17,7 @@ type Load = { status: "idle" } | { status: "loading" } | { status: "failed" } | 
  *
  * Remount (by key) when the language or answers change, which returns it to idle.
  */
-export function PlanPanel({ profile, live }: { profile: HouseholdProfile; live: { reading: boolean; forecast: boolean } }) {
+export function PlanPanel({ profile, live, walkingGated }: { profile: HouseholdProfile; live: { reading: boolean; forecast: boolean }; walkingGated: boolean }) {
   const { t, f, locale } = useLocale();
   const [load, setLoad] = useState<Load>({ status: "idle" });
 
@@ -58,7 +58,10 @@ export function PlanPanel({ profile, live }: { profile: HouseholdProfile; live: 
             {button(t.plan.retry)}
           </div>
         )}
-        {load.status === "ready" && (
+        {/* A plan reused from earlier may predate today's poor air: don't show a walking step the page no longer offers. */}
+        {load.status === "ready" && walkingGated && load.data.plan.steps.some((s) => s.refId.endsWith("->walk-cycle")) ? (
+          <p className="mt-4">{t.plan.outdated}</p>
+        ) : load.status === "ready" && (
           <div className="mt-4">
             {/* A plan is reused for up to three hours, so its age is stated like a reading's. */}
             <p className="text-sm font-medium">
@@ -113,7 +116,7 @@ export function PlanPanel({ profile, live }: { profile: HouseholdProfile; live: 
                         ))}
                         {/* These quotes are from other documents than the figure's link above, so each names its own. */}
                         <Evidence summary={t.plan.sourceSays}>
-                          {ref.co2Only && <p className="text-ink">{t.swapsSection.co2OnlyNote}</p>}
+                          {ref.co2Only && <p className="text-ink">{t.swapsSection.co2OnlyNotes[ref.co2Only]}</p>}
                           <p className="font-medium text-ink">{t.indoor.originalWording}</p>
                           <Quotes items={ref.why} />
                         </Evidence>

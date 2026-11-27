@@ -1,9 +1,11 @@
 "use client";
 
 import { CITATIONS } from "@/lib/grounding/citations";
+import type { GroundingSnapshot } from "@/lib/grounding/types";
 import type { SwapAssumptionId } from "@/lib/i18n/strings/en";
 import type { HouseholdProfile } from "@/lib/profile/types";
 import { EMISSION_FACTORS } from "@/lib/sourced/emissionFactors";
+import { categorySignal } from "@/lib/sourced/guidance";
 import { swapsFor, type FactorTerm, type Swap, type WithheldReason, type WithheldSwap } from "@/lib/sourced/swaps";
 import { citationLabel, describeSaving, swapTarget } from "@/lib/view/describe";
 import { Evidence, Quotes } from "./Evidence";
@@ -66,8 +68,8 @@ function Working({ swap }: { swap: Swap }) {
       </div>
 
       <div>
-        <p className="font-medium">{swap.co2Only ? s.aboutFuelsTitle : s.whyTitle}</p>
-        {swap.co2Only && <p>{s.co2OnlyNote}</p>}
+        <p className="font-medium">{swap.co2Only ? s.aboutTitle : s.whyTitle}</p>
+        {swap.co2Only && <p>{s.co2OnlyNotes[swap.co2Only]}</p>}
         <Quotes items={swap.why} />
       </div>
     </Evidence>
@@ -81,10 +83,11 @@ function groupByReason(withheld: readonly WithheldSwap[]): [WithheldReason, With
   return [...groups];
 }
 
-export function SwapsPanel({ profile }: { profile: HouseholdProfile }) {
+export function SwapsPanel({ profile, snapshot }: { profile: HouseholdProfile; snapshot: GroundingSnapshot }) {
   const { t, f } = useLocale();
   const s = t.swapsSection;
-  const { swaps, withheld } = swapsFor(profile);
+  const signal = categorySignal(snapshot);
+  const { swaps, withheld, gated } = swapsFor(profile, signal);
 
   return (
     <section aria-labelledby="swaps-title" className="border-t-2 border-ink/15 pt-5">
@@ -93,7 +96,7 @@ export function SwapsPanel({ profile }: { profile: HouseholdProfile }) {
       </h2>
       <p className="mt-1 text-sm text-muted">{s.intro}</p>
 
-      {swaps.length === 0 && withheld.length === 0 && <p className="mt-3">{s.none}</p>}
+      {swaps.length === 0 && withheld.length === 0 && gated.length === 0 && <p className="mt-3">{s.none}</p>}
 
       {swaps.length > 0 && (
         <ul className="mt-3 divide-y divide-ink/10">
@@ -107,6 +110,18 @@ export function SwapsPanel({ profile }: { profile: HouseholdProfile }) {
           ))}
         </ul>
       )}
+
+      {gated.map((g) => (
+        <div key={g.id} className="mt-4">
+          <h3 className="font-semibold">{s.gatedTitle}</h3>
+          <p className="mt-0.5 text-sm">
+            {signal.basis === "unknown" ? s.gatedUnknown : s.gatedPoor({ category: t.categories[signal.category] })}
+          </p>
+          <Evidence summary={t.plan.sourceSays}>
+            <Quotes items={g.why} />
+          </Evidence>
+        </div>
+      ))}
 
       {withheld.length > 0 && (
         <div className="mt-4">
